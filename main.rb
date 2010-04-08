@@ -156,7 +156,8 @@ class VideoMimeData < Qt::MimeData
 end
 class CustomWidget < KDE::MainWindow
 
-  slots 'toogleVolumeSlider(bool)', 'setFullScreen(bool)', 'pausedChanged(bool)'
+  slots 'toogleVolumeSlider(bool)', 'setFullScreen(bool)', \
+        'stateChanged(Phonon::State, Phonon::State)'
 
   def addAction action
     @actionCollection.addAction action.object_name, action
@@ -169,7 +170,14 @@ class CustomWidget < KDE::MainWindow
   def setFullScreen full
   end
 
-  def pausedChanged paused
+  def stateChanged state, stateBefore
+    if state == Phonon::PlayingState
+      @playPauseAction.checked = true
+    elsif state == Phonon::PausedState
+      @playPauseAction.checked = false
+    else
+      #...
+    end
   end
 
   def ini_phonon
@@ -178,16 +186,35 @@ class CustomWidget < KDE::MainWindow
     @seekSlider = Phonon::SeekSlider.new @videoPlayer.mediaObject, self
 
     @volumeSlider = Phonon::VolumeSlider.new @videoPlayer.audioOutput, self
-    @volumeSlider.setMuteVisible false
 
-    @muteAction = KDE::Action.new KDE::Icon.new( 'audio-volume-medium' ), i18n( 'Mute Volume' ), self
-    @actionCollection.addAction 'volume-mute', @muteAction
+    @muteAction = @actionCollection.addAction 'volume-mute', KDE::Action.new( KDE::Icon.new( 'audio-volume-medium' ), i18n( 'Mute Volume' ), self)
     @muteAction.checkable = true
+    @muteAction.shortcut = KDE::Shortcut.new Qt::Key_M, Qt::Key_VolumeMute
     @muteAction.connect( SIGNAL('toggled(bool)') ) do |muted|
-      @muteAction.set_icon KDE::Icon.new muted ? 'audio-volume-muted' : 'audio-volume-medium'
+      @muteAction.set_icon KDE::Icon.new muted ? 'player-volume' : 'player-volume-muted' # audio-volume-muted' : 'audio-volume-medium'
       @videoPlayer.audioOutput.muted = muted
     end
-#     connect @muteAction, SIGNAL('toggled(bool)'), @videoPlayer.audioOutput, SLOT('setMuted(bool)')
+    connect(@volumeSlider.audioOutput, SIGNAL('mutedChanged(bool)'), @muteAction, SLOT('setChecked(bool)') )
+
+
+    @playPauseAction = @actionCollection.addAction 'switch-pause', KDE::Action.new( self )
+    @playPauseAction.checkable = true
+    @playPauseAction.shortcut = KDE::Shortcut.new( Qt::Key_Backspace, Qt::Key_MediaStop )
+    @playPauseAction.connect( SIGNAL('toggled(bool)') ) do |playing|
+      if playing
+        @playPauseAction.text = i18n '&Play'
+        @playPauseAction.icon = KDE::Icon.new 'media-playback-start'
+        @videoPlayer.play
+      else
+        @playPauseAction.text = i18n '&Pause'
+        @playPauseAction.icon = KDE::Icon.new 'media-playback-pause'
+        @videoPlayer.pause
+      end
+    end
+    connect(@videoPlayer.mediaObject, SIGNAL('stateChanged(Phonon::State, Phonon::State)'), self, SLOT('stateChanged(Phonon::State, Phonon::State)'))
+#     @videoPlayer.mediaObject.connect( SIGNAL('stateChanged(Phonon::State, Phonon::State)') ) do
+#       puts 'hier'
+#     end
   end
 
   def initialize
@@ -213,7 +240,8 @@ class CustomWidget < KDE::MainWindow
 #     @mediaObject = Phonon::MediaObject.new self
 #     @mediaObject.setCurrentSource Phonon::MediaSource.new('/home/rriemann/Documents/Videos/Sita_Sings_the_Blues.ogv')
 #     @centralwidget.play @mediaObject
-    @videoPlayer.play Phonon::MediaSource.new('/home/rriemann/Documents/Videos/Sita_Sings_the_Blues.ogv')
+#     @videoPlayer.play Phonon::MediaSource.new('/home/rriemann/Documents/Videos/Sita_Sings_the_Blues.ogv')
+    @videoPlayer.play Phonon::MediaSource.new('/home/rriemann/Documents/Videos/Player/Austin_Powers_Goldstaender_08.08.15_20-15_rtl2_115_TVOON_DE.mpg.mp4')
 #       @centralwidget.play Phonon::MediaSource.new('http://videos.mozilla.org/firefox/3.6/meetfirefox/FF3.6_Screencast_FINAL.ogv')
 
     #### prepare menus
@@ -239,13 +267,6 @@ class CustomWidget < KDE::MainWindow
     playerMenu.add_action actionPrevious
     controlBar.add_action actionPrevious
 
-    @actionPlayPause = KDE::Action.new self
-    @actionPlayPause.checkable = true
-    Qt::Object.connect(@actionPlayPause, SIGNAL('triggered(bool)'), self, SLOT('pausedChanged(bool)'))
-    @statusPause = [ KDE::Icon.new( 'media-playback-pause' ), i18n( 'Pause' ) ]
-    @statusPlay = [ KDE::Icon.new( 'media-playback-start' ), i18n( 'Plaz' ) ]
-    @actionPlayPause.set_shortcut KDE::Shortcut.new( Qt::Key_Backspace, Qt::Key_MediaStop )
-    @actionCollection.add_action 'controls_play_pause', @actionPlayPause
     playerMenu.add_action @actionPlayPause
     controlBar.add_action @actionPlayPause
 
@@ -276,7 +297,7 @@ class CustomWidget < KDE::MainWindow
 
 
     audioMenu.add_action @muteAction
-    controlBar.add_action @muteAction
+#     controlBar.add_action @muteAction
 
     volumeSliderAction = KDE::Action.new i18n( 'Volume Slider' ), self
     volumeSliderAction.default_widget = @volumeSlider
