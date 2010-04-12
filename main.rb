@@ -1,60 +1,48 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env ruby1.9
 # kate: remove-trailing-space on; replace-trailing-space-save on; indent-width 2; indent-mode ruby; syntax ruby;
 
 require 'korundum4'
-
 require 'phonon'
+require 'json'
+require 'net/http'
+require 'cgi'
 
 class Video < Qt::Object
-  attr_accessor :author, :title, :description, :webpage, :duration, :views, \
-                :published_datetime
-  attr_reader :thumbnailUrls, :thumbnail, :hd_enabled
-  slots 'set_thumbnail(QByteArray)', 'got_video_info(QByteArray)', \
-        'error_video_info(QNetworkReply)', 'scrap_web_page(QByteArray)', \
-        'got_hd_headers(QNetworkReply)'
 
-  def initialize *args
-    super *args
+  slots 'get_thumbnail()', 'get_video()', 'get_video_link()', 'destroy_video()'
+  signals 'got_thumbnail(bool)', 'loading_video(bool)', 'got_video_link(bool)'
 
-    @view = nil
-    @duration = 0
-    @hd_enabled = nil
-    @thumbnailUrls = Array.new # expects QUrl elements
+  def initialize entry
+    @id = entry["id"]["$t"]
+    @published = entry["published"]["$t"]
+    @updated = entry["updated"]["$t"]
+    @title = entry["title"]["$t"]
+    @author = entry["author"][0]["name"]["$t"]
+    @author_uri = entry["author"][0]["uri"]["$t"]
+    @link = entry["link"][0]["href"] # "rel"=>"alternate"
+    @video_url = nil
+    @video = nil
+    @link_responses = entry["link"][1]["href"] # "rel"=>"responses", xml-file
+    @link_related = entry["link"][2]["href"] # "rel"=>"related", xml-file
+    @duration = entry["media$group"]["yt$duration"]["seconds"]
+    @thumbnail_url = entry["media$group"]["media$thumbnail"][-1]["url"]
     @thumbnail = nil
+    @description = entry["content"]["$t"]
   end
 
-  def push_thumbnailUrl url
-    @thumbnailUrls.push url
+  def get_thumbnail
+    res = false
+    emit got_thumbnail res
   end
 
-  def preload_thumbnail
-    unless @thumbnailUrls.empty?
-      #...
+  def get_video_link
+    unless @video_url == false
+      msg = `python youtube-dl -gb #{@link}`.strip # e= title, b=best quality, g = url
+      @video_url = (msg =~ /ERROR/) ? false : msg
     end
+    emit got_video_link( @video_url != false )
   end
-
-  def load_stream_url
-  end
-
-  def set_thumbnail str # slot
-  end
-
-#   private
-
-  def got_video_info str # slot
-  end
-
-  def error_video_info networkReply # slot
-  end
-
-  def scrap_web_page str # slot
-  end
-
-  def got_hd_headers networkReply # slot
-  end
-
 end
-
 
 class CustomWidget < KDE::MainWindow
 
