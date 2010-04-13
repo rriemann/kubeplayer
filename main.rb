@@ -7,10 +7,7 @@ require 'json'
 require 'net/http'
 require 'cgi'
 
-class Video < Qt::Object
-
-  slots 'get_thumbnail()', 'get_video()', 'get_video_link()', 'destroy_video()'
-  signals 'got_thumbnail(bool)', 'loading_video(bool)', 'got_video_link(bool)'
+class Video
 
   def initialize entry
     @id = entry["id"]["$t"]
@@ -30,49 +27,31 @@ class Video < Qt::Object
     @description = entry["content"]["$t"]
   end
 
-  def get_thumbnail
-    emit got_thumbnail false
-  end
-
-  def get_video_link
+  def video_url
     unless @video_url == false
       msg = `python youtube-dl -gb #{@link}`.strip # e= title, b=best quality, g = url
       @video_url = (msg =~ /ERROR/) ? false : msg
     end
-    emit got_video_link( @video_url != false )
+    @video_url
   end
 
-  def get_video
-  end
-
-  def destroy_video
-  end
 end
 
 class CustomWidget < KDE::MainWindow
 
-  slots 'toogleVolumeSlider(bool)', 'setFullScreen(bool)', \
-        'stateChanged(Phonon::State, Phonon::State)'
-
-  def addAction action
-    @actionCollection.addAction action.object_name, action
-  end
+  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)'
 
   def toogleVolumeSlider show
   end
 
-
-  def setFullScreen full
-  end
-
   def stateChanged state, stateBefore
-#     if state == Phonon::PlayingState
-#       action.checked = true
-#     elsif state == Phonon::PausedState
-#       action.checked = false
-#     else
-#       #...
-#     end
+    if state == Phonon::PlayingState
+      @playPauseAction.checked = true
+    elsif state == Phonon::PausedState
+      @playPauseAction.checked = false
+    else
+      #...
+    end
   end
 
   def ini_phonon collection, menu, controlBar
@@ -81,23 +60,22 @@ class CustomWidget < KDE::MainWindow
     seekSlider = Phonon::SeekSlider.new @videoPlayer.mediaObject, self
 
     # action play pause
-    action = collection.add_action 'switch-pause', KDE::Action.new( self )
-    action.checkable = true
-    action.shortcut = KDE::Shortcut.new Qt::Key_Backspace, Qt::Key_MediaStop
-    action.connect( SIGNAL('toggled(bool)') ) do |playing|
+    @playPauseAction = collection.add_action 'switch-pause', KDE::Action.new( self )
+    @playPauseAction.checkable = true
+    @playPauseAction.shortcut = KDE::Shortcut.new Qt::Key_Backspace, Qt::Key_MediaStop
+    @playPauseAction.icon = KDE::Icon.new 'media-playback-pause'
+    @playPauseAction.text = i18n '&Pause'
+    @playPauseAction.enabled = false
+    @playPauseAction.connect( SIGNAL('toggled(bool)') ) do |playing|
       if playing
-        @playPauseAction.text = i18n '&Play'
-        @playPauseAction.icon = KDE::Icon.new 'media-playback-pause'
         @videoPlayer.play
       else
-        @playPauseAction.text = i18n '&Pause'
-        @playPauseAction.icon = KDE::Icon.new 'media-playback-start'
         @videoPlayer.pause
       end
     end
     connect(@videoPlayer.mediaObject, SIGNAL('stateChanged(Phonon::State, Phonon::State)'), self, SLOT('stateChanged(Phonon::State, Phonon::State)'))
-    menu.add_action action
-    controlBar.add_action action
+    menu.add_action @playPauseAction
+    controlBar.add_action @playPauseAction
 
     # action previous
     action = collection.add_action 'controls-previous', KDE::Action.new( KDE::Icon.new( 'media-skip-backward' ), i18n( 'Previous' ), self )
@@ -135,12 +113,6 @@ class CustomWidget < KDE::MainWindow
 
     menu.add_separator
 
-    # action fullscreen
-#     action = collection.add_action 'switch-fullscreen', KDE::StandardAction::fullScreen( @videoPlayer.video_widget, SLOT( 'setFullScreen(bool)' ), self, collection)
-    action = collection.add_action 'switch-fullscreen', KDE::StandardAction::fullScreen( self, SLOT( 'setFullScreen(bool)' ), self, collection)
-    menu.add_action action
-    controlBar.add_action action
-
     action = collection.add_action 'volume-slider', KDE::Action.new( i18n( 'Volume Slider' ), self )
     action.default_widget = volumeSlider
     controlBar.add_action action
@@ -154,16 +126,6 @@ class CustomWidget < KDE::MainWindow
   def initialize
 
     super
-
-#     @config = KDE::Global.config
-#     configGroup = @config.group "Settings"
-#     b = Qt::DateTime.currentDateTime
-#     a = configGroup.readEntry "time", b
-#     puts "was: " + a.toString
-#     puts "now: " + b.toString
-#     configGroup.writeEntry "time", b
-#     @config.sync
-
 
     #### prepare menus
     collection = KDE::ActionCollection.new self
@@ -198,27 +160,44 @@ class CustomWidget < KDE::MainWindow
     controlBar.show
 
     setCentralWidget @videoPlayer
-    youtube_url = 'http://www.youtube.com/watch?v=lg8LfoyDFUM'
-    a = Time.now
-    title,video_url = `python youtube-dl -geb #{youtube_url}`.strip.split $/
-    puts (Time.now - a)
-    setWindowTitle title
-    @videoPlayer.play Phonon::MediaSource.new video_url
 
-#     retranslateUi
+    menu = KDE::Menu.new i18n('&View'), self
+    menuBar.add_menu menu
+
+    # add clip list dock widget
+    dock = Qt::DockWidget.new self
+    action = collection.add_action 'toogle-listwidgetcontainer-dock', dock.toggle_view_action
+    menu.add_action action
+    dock.objectName = "listWidgetContainerDock"
+    dock.windowTitle = "Clips"
+    dock.allowedAreas = Qt::LeftDockWidgetArea, Qt::RightDockWidgetArea
+    self.add_dock_widget Qt::LeftDockWidgetArea, dock
+    @listWidget = KDE::ListWidget.new dock
+    dock.widget = @listWidget
+
+    # add search field
+    @searchWidget = KDE::LineEdit.new self
+    @searchWidget.clear_button_shown = true
+    @searchWidget.connect( SIGNAL :returnPressed ) do
+      query @searchWidget.text, 0
+      @searchWidget.clear
+    end
+    controlBar.add_widget @searchWidget
+
+    #     @videoPlayer.play Phonon::MediaSource.new video_url
 
     self.show
   end
 
-  def retranslateUi
-#     @menuFile.title = i18n "File"
-#     setWindowTitle i18n "MainWindow"
-    # @statusBar.showMessage i18n "Loading"
-#     @actionQuit.text = i18n "Quit"
-#     @actionQuit.shortcut =  KDE::Shortcut.new i18nc( "Quit", "Ctrl+Q" )
-  end
+  def query query, start
+    max_results = 10
+    uri = URI.parse "http://gdata.youtube.com/feeds/api/videos?q=#{CGI.escape query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
+    response, body = Net::HTTP.start(uri.host, uri.port) do |http|
+      http.get(uri.path+'?'+uri.query)
+    end
+    videos = JSON.parse( body )["feed"]["entry"].collect do |entry|
 
-  private :setFullScreen
+    end
 
 end
 
