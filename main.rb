@@ -31,8 +31,7 @@ class Video < Qt::Object
   end
 
   def get_thumbnail
-    res = false
-    emit got_thumbnail res
+    emit got_thumbnail false
   end
 
   def get_video_link
@@ -41,6 +40,12 @@ class Video < Qt::Object
       @video_url = (msg =~ /ERROR/) ? false : msg
     end
     emit got_video_link( @video_url != false )
+  end
+
+  def get_video
+  end
+
+  def destroy_video
   end
 end
 
