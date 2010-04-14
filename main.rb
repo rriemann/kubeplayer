@@ -3,11 +3,14 @@
 
 require 'korundum4'
 require 'phonon'
+require 'rubygems'
 require 'json'
 require 'net/http'
 require 'cgi'
 
 class Video
+
+  attr_reader :title
 
   def initialize entry
     @id = entry["id"]["$t"]
@@ -27,12 +30,39 @@ class Video
     @description = entry["content"]["$t"]
   end
 
+  def to_s
+    @title
+  end
+
   def video_url
     unless @video_url == false
       msg = `python youtube-dl -gb #{@link}`.strip # e= title, b=best quality, g = url
       @video_url = (msg =~ /ERROR/) ? false : msg
     end
     @video_url
+  end
+
+end
+
+class Videos < Qt::AbstractListModel
+
+  attr_reader :videos
+
+  def initialize videos
+    super()
+    @videos = videos
+  end
+
+  def data modelIndex, role
+    if modelIndex.is_valid and role == Qt::DisplayRole and modelIndex.row < @videos.size
+      Qt::Variant.new @videos[modelIndex.row].title
+    else
+      Qt::Variant.new
+    end
+  end
+
+  def rowCount modelIndex
+    @videos.size
   end
 
 end
@@ -46,11 +76,14 @@ class CustomWidget < KDE::MainWindow
 
   def stateChanged state, stateBefore
     if state == Phonon::PlayingState
+      @seekSlider.mediaObject = @videoPlayer.mediaObject
       @playPauseAction.checked = true
+      @playPauseAction.enabled = true
     elsif state == Phonon::PausedState
       @playPauseAction.checked = false
+      @playPauseAction.enabled = true
     else
-      #...
+      @playPauseAction.enabled = false # unless state == Phonon::BufferingState
     end
   end
 
@@ -58,6 +91,7 @@ class CustomWidget < KDE::MainWindow
     @videoPlayer = Phonon::VideoPlayer.new Phonon::VideoCategory, self
     volumeSlider = Phonon::VolumeSlider.new @videoPlayer.audioOutput, self
     seekSlider = Phonon::SeekSlider.new @videoPlayer.mediaObject, self
+    @seekSlider = seekSlider
 
     # action play pause
     @playPauseAction = collection.add_action 'switch-pause', KDE::Action.new( self )
@@ -86,6 +120,9 @@ class CustomWidget < KDE::MainWindow
     # action stop
     action = collection.add_action 'controls-stop', KDE::Action.new( KDE::Icon.new( 'media-playback-stop' ), i18n( 'Stop' ), self )
     action.shortcut = KDE::Shortcut.new Qt::Key_Backspace, Qt::Key_MediaStop
+    action.connect( SIGNAL( :triggered ) ) do
+      @videoPlayer.stop
+    end
     menu.add_action action
     controlBar.add_action action
 
@@ -172,8 +209,12 @@ class CustomWidget < KDE::MainWindow
     dock.windowTitle = "Clips"
     dock.allowedAreas = Qt::LeftDockWidgetArea, Qt::RightDockWidgetArea
     self.add_dock_widget Qt::LeftDockWidgetArea, dock
-    @listWidget = KDE::ListWidget.new dock
+    @listWidget = Qt::ListView.new dock
+    @listWidget.view_mode = Qt::ListView::ListMode
     dock.widget = @listWidget
+    @listWidget.connect( SIGNAL('doubleClicked(const QModelIndex&)') ) do |modelIndex|
+      @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos[modelIndex.row].video_url
+    end
 
     # add search field
     @searchWidget = KDE::LineEdit.new self
@@ -184,7 +225,9 @@ class CustomWidget < KDE::MainWindow
     end
     controlBar.add_widget @searchWidget
 
-    #     @videoPlayer.play Phonon::MediaSource.new video_url
+    video_url = 'http://www.youtube.com/get_video?video_id=BU9w9ZtiO8I&t=vjVQa1PpcFPXqhCZqn_V_fcSdspsKvB16IM6uoGvNug=&eurl=&el=embedded&ps=default&fmt=18'
+#     video_url = '/home/rriemann/Documents/Videos/Player/Austin_Powers_Goldstaender_08.08.15_20-15_rtl2_115_TVOON_DE.mpg.mp4-cut.avi'
+    @videoPlayer.play Phonon::MediaSource.new video_url
 
     self.show
   end
@@ -195,9 +238,9 @@ class CustomWidget < KDE::MainWindow
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
     end
-    videos = JSON.parse( body )["feed"]["entry"].collect do |entry|
-
-    end
+    videos = Videos.new( JSON.parse( body )["feed"]["entry"].collect { |entry| Video.new entry } )
+    @listWidget.model = videos
+  end
 
 end
 
