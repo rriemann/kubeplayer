@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 # kate: remove-trailing-space on; replace-trailing-space-save on; indent-width 2; indent-mode ruby; syntax ruby;
 
 require 'korundum4'
@@ -76,14 +76,14 @@ class CustomWidget < KDE::MainWindow
 
   def stateChanged state, stateBefore
     if state == Phonon::PlayingState
-      @seekSlider.mediaObject = @videoPlayer.mediaObject
       @playPauseAction.checked = true
       @playPauseAction.enabled = true
     elsif state == Phonon::PausedState
       @playPauseAction.checked = false
       @playPauseAction.enabled = true
     else
-      @playPauseAction.enabled = false # unless state == Phonon::BufferingState
+      @playPauseAction.checked = false
+      @playPauseAction.enabled = false
     end
   end
 
@@ -91,7 +91,6 @@ class CustomWidget < KDE::MainWindow
     @videoPlayer = Phonon::VideoPlayer.new Phonon::VideoCategory, self
     volumeSlider = Phonon::VolumeSlider.new @videoPlayer.audioOutput, self
     seekSlider = Phonon::SeekSlider.new @videoPlayer.mediaObject, self
-    @seekSlider = seekSlider
 
     # action play pause
     @playPauseAction = collection.add_action 'switch-pause', KDE::Action.new( self )
@@ -225,9 +224,10 @@ class CustomWidget < KDE::MainWindow
     end
     controlBar.add_widget @searchWidget
 
-    video_url = 'http://www.youtube.com/get_video?video_id=BU9w9ZtiO8I&t=vjVQa1PpcFPXqhCZqn_V_fcSdspsKvB16IM6uoGvNug=&eurl=&el=embedded&ps=default&fmt=18'
+#     video_url = 'http://www.youtube.com/get_video?video_id=BU9w9ZtiO8I&t=vjVQa1PpcFPXqhCZqn_V_fcSdspsKvB16IM6uoGvNug=&eurl=&el=embedded&ps=default&fmt=18'
 #     video_url = '/home/rriemann/Documents/Videos/Player/Austin_Powers_Goldstaender_08.08.15_20-15_rtl2_115_TVOON_DE.mpg.mp4-cut.avi'
-    @videoPlayer.play Phonon::MediaSource.new video_url
+#     video_url = '/home/rriemann/Documents/Videos/Youtube/Acoustic Guitar/Paco De Lucia - Solea.flv'
+#     @videoPlayer.play Phonon::MediaSource.new video_url
 
     self.show
   end
