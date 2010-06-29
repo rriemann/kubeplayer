@@ -206,7 +206,7 @@ class CustomWidget < KDE::MainWindow
     menu.add_action action
     dock.objectName = "listWidgetContainerDock"
     dock.windowTitle = "Clips"
-    dock.allowedAreas = Qt::LeftDockWidgetArea, Qt::RightDockWidgetArea
+    dock.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
     self.add_dock_widget Qt::LeftDockWidgetArea, dock
     @listWidget = Qt::ListView.new dock
     @listWidget.view_mode = Qt::ListView::ListMode
