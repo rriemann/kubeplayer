@@ -1,0 +1,41 @@
+= Readme
+
+== Install Dependencies
+
+* requires youtube-dl http://bitbucket.org/rg3/youtube-dl/wiki/Home
+  (which requires itself python ) in the same directory as the progam file
+* requires at least ruby 1.8, works with ruby 1.9
+* if you want to use ruby 1.8 you need to install json ruby package via <tt>gem install json</tt>
+  ruby 1.9 includes json already
+* you need the kde4 ruby bindings called korundum4 built with phonon support,
+  most distros seems to deliver korundum4 binaries without phonon support,
+  so you maybe have to build korundum4 yourself by checking out kdebindings from trunk
+  and using ccmake to disable everything you dont need here (i.e. kross..., python...)
+  
+* questions related to the installation process goes to saLOUt (find me in #kde-bindings)
+
+== Install
+
+* after you managed to resolv all dependencies you just have to place the main.rb
+  in the same directory as the youtube-dl file
+  
+== Usage
+* chmod the file with <tt>chmod +x main.rb</tt> and click on it
+* or type in console <tt>ruby main.rb</tt> to start the program
+* type in a video query using the line edit and press enter
+* use double click on the list items to start the video
+* dont expect the program to work proplery (see section Bugs)
+
+== Acknowledgments goes to
+* korundum4 team which provides a really nice kde api and fixes bugreports within hours
+* the author of MiniTube which have inspired this project
+
+== Bugs
+* this is not even an alpha release, it's more like a prove of concept,
+  so there are no bugs per definition. ;)
+
+== License
+
+* the code is published under the terms of GPL version 2 or any newer version,
+  you decide.
+  http://www.gnu.org/licenses/gpl-2.0.txt
