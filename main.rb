@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 # kate: remove-trailing-space on; replace-trailing-space-save on; indent-width 2; indent-mode ruby; syntax ruby;
 
 require 'korundum4'
@@ -36,8 +36,16 @@ class Video
 
   def video_url
     unless @video_url == false
-      msg = `python youtube-dl -gb #{@link}`.strip # e= title, b=best quality, g = url
-      @video_url = (msg =~ /ERROR/) ? false : msg
+      is_hd = false
+      video_url = 'http://www.youtube.com/get_video?'
+      video_url += 'video_id=' + @link.match(/\bv=([^&]+)/)[1]
+      uri = URI.parse @link
+      response, body = Net::HTTP.start(uri.host, uri.port) do |http|
+        http.get(uri.path+'?'+uri.query)
+      end
+      video_url += '&t=' + body.match(/\bt=([^&]+)/)[1]
+      video_url += '&fmt=' + (is_hd ? '22' : '18')
+      @video_url = KDE::Url::decode_string video_url
     end
     @video_url
   end
@@ -225,9 +233,9 @@ class CustomWidget < KDE::MainWindow
     end
     controlBar.add_widget @searchWidget
 
-    video_url = 'http://www.youtube.com/get_video?video_id=BU9w9ZtiO8I&t=vjVQa1PpcFPXqhCZqn_V_fcSdspsKvB16IM6uoGvNug=&eurl=&el=embedded&ps=default&fmt=18'
+    # video_url = 'http://www.youtube.com/get_video?video_id=BU9w9ZtiO8I&t=vjVQa1PpcFPXqhCZqn_V_fcSdspsKvB16IM6uoGvNug=&eurl=&el=embedded&ps=default&fmt=18'
 #     video_url = '/home/rriemann/Documents/Videos/Player/Austin_Powers_Goldstaender_08.08.15_20-15_rtl2_115_TVOON_DE.mpg.mp4-cut.avi'
-    @videoPlayer.play Phonon::MediaSource.new video_url
+    # @videoPlayer.play Phonon::MediaSource.new video_url
 
     self.show
   end
