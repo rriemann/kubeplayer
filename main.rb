@@ -8,38 +8,149 @@ require 'json'
 require 'net/http'
 require 'cgi'
 
+
+# Object and Qt::Variant needs to be extended to allow the emitting of ruby
+# objects
+#
+# http://techbase.kde.org/Development/Languages/Ruby#Emitting_Ruby_Classes
+
+class Object #:nodoc:
+    def to_variant
+        Qt::Variant.new object_id
+    end
+end
+
+class Qt::Variant #:nodoc:
+    def to_object
+        ObjectSpace._id2ref to_int
+    end
+end
+
+# The class video is an abstract class to download, hold and organize all
+# important data. It gets subclassed by the VideoProvider classes.
+#
+# The VideoProvider class is expected to reimplement #accept? and others
+#
+
 class Video
 
+  # contains the list with all known providers
+  @@provider = []
+  def self.register_provider aProvider
+    @@provider.push aProvider
+  end
+
+  #:call-seq:
+  #  accept?(KDE::Url) => bool
+  #
+  # this function has to be reimplemented by its subclasses
+  def self.accept? kurl
+    false
+  end
+
+  #:call-seq:
+  # new(KDE::Url) => VideoProvider
+  #
+  # you get a subclass back or nil
+  def self.get kurl
+    @@provider.each do |aProvider|
+      if aProvider.accept? kurl
+        return aProvider.new kurl
+      end
+    end
+    return false
+  end
+
+  #:call-seq:
+  # title() => string
+  #
+  # get the title of the video
   attr_reader :title
 
-  def initialize entry
-    @id = entry["id"]["$t"]
-    @published = entry["published"]["$t"]
-    @updated = entry["updated"]["$t"]
-    @title = entry["title"]["$t"]
-    @author = entry["author"][0]["name"]["$t"]
-    @author_uri = entry["author"][0]["uri"]["$t"]
-    @link = entry["link"][0]["href"] # "rel"=>"alternate"
+  #:call-seq:
+  # thumbnail_url() => KDE::Url
+  #
+  # get the url to the image of the thumbnail
+  attr_reader :thumbnail_url
+
+  #:call-seq:
+  # video_url() => KDE::Url
+  #
+  # get the real video url
+  attr_reader :video_url
+
+  #:call-seq:
+  # title() => KDE::Url
+  #
+  # get the internet page of this video
+  attr_reader :url
+
+  #:call-seq:
+  # title() => string
+  #
+  # get the author of this video
+  attr_reader :author
+
+  #:call-seq:
+  # duration() => Float
+  #
+  # get the duration in ms
+  attr_reader :duration
+
+  #:method: getVideoInfo(QVariant)
+  #slots 'get_video_info()'
+
+  #signals 'got_video_info(QVariant)'
+
+  # Do not forget to use Video#get to create a new subclassed video object.
+  def initialize # :notnew:
+    @title = nil
+    @thumbnail_url = nil
     @video_url = nil
-    @video = nil
-    @link_responses = entry["link"][1]["href"] # "rel"=>"responses", xml-file
-    @link_related = entry["link"][2]["href"] # "rel"=>"related", xml-file
-    @duration = entry["media$group"]["yt$duration"]["seconds"]
-    @thumbnail_url = entry["media$group"]["media$thumbnail"][-1]["url"]
-    @thumbnail = nil
-    @description = entry["content"]["$t"]
+    @url = nil
+    @author = nil
+    @duration = nil
   end
 
   def to_s
-    @title
+    @title or '[unbenannt]'
+  end
+
+   # FIXME (this implementation doesn't work to protect the constructor
+  protected :initialize
+end
+
+class YoutubeVideo < Video
+
+  @@validUrl = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
+
+  #:call-seq:
+  #  accept?(KDE::Url) => bool
+  def self.accept? kurl
+    @@validUrl.exact_match kurl.url
+  end
+
+#   def get_video_info qvariant = nil
+#     video_url
+#
+#     emit got_video_info
+#   end
+
+  def initialize entry = nil
+    super()
+
+    [:title, :thumbnail_url, :video_url, :url, :author, :duration].each do |attr|
+      self.instance_variable_set(('@'+ attr.to_s).to_sym, entry[attr]) if entry.has_key? attr
+    end
+    puts @url.inspect
   end
 
   def video_url
     unless @video_url == false
       is_hd = false
       video_url = 'http://www.youtube.com/get_video?'
-      video_url += 'video_id=' + @link.match(/\bv=([^&]+)/)[1]
-      uri = URI.parse @link
+      video_url += 'video_id=' + @url.url.match(/\bv=([^&]+)/)[1]
+      uri = URI.parse @url.url
       response, body = Net::HTTP.start(uri.host, uri.port) do |http|
         http.get(uri.path+'?'+uri.query)
       end
@@ -49,8 +160,9 @@ class Video
     end
     @video_url
   end
-
 end
+
+Video.register_provider YoutubeVideo
 
 class Videos < Qt::AbstractListModel
 
@@ -63,7 +175,7 @@ class Videos < Qt::AbstractListModel
 
   def data modelIndex, role
     if modelIndex.is_valid and role == Qt::DisplayRole and modelIndex.row < @videos.size
-      Qt::Variant.new @videos[modelIndex.row].title
+      Qt::Variant.new @videos[modelIndex.row].to_s
     else
       Qt::Variant.new
     end
@@ -246,7 +358,13 @@ class CustomWidget < KDE::MainWindow
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
     end
-    videos = Videos.new( JSON.parse( body )["feed"]["entry"].collect { |entry| Video.new entry } )
+    videos = Videos.new( JSON.parse( body )["feed"]["entry"].collect { |entry| YoutubeVideo.new(
+      :title => entry["title"]["$t"],
+      :thumbnail_url => KDE::Url.new(entry["link"][0]["href"]),
+      :url => KDE::Url.new(entry["link"][0]["href"]),
+      :duration => entry["media$group"]["yt$duration"]["seconds"].to_f*1000,
+      :author => entry["author"][0]["name"]["$t"]
+    ) } )
     @listWidget.model = videos
   end
 
