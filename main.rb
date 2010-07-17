@@ -15,7 +15,6 @@ require 'cgi'
 #
 # http://techbase.kde.org/Development/Languages/Ruby#Emitting_Ruby_Classes
 
-=begin
 class Object #:nodoc:
     def to_variant
         Qt::Variant.new object_id
@@ -27,7 +26,6 @@ class Qt::Variant #:nodoc:
         ObjectSpace._id2ref to_int
     end
 end
-=end
 
 # The class video is an abstract class to download, hold and organize all
 # important data. It gets subclassed by the VideoProvider classes.
@@ -199,24 +197,160 @@ Video.register_provider YoutubeVideo
 
 class VideoList < Qt::AbstractListModel
 
+  slots :update_thumbnail
+  signals 'active_row_changed(int)', 'dataChanged(int,int)'
+
+  ItemTypeRole, VideoRole, ActiveTrackRole = *(Qt::UserRole...(Qt::UserRole+3))
+  ItemTypeVideo,ItemTypeShowMore = 1,2
+
   attr_reader :videos
 
   def initialize videos = nil
     super()
     @videos = []
     @videos = videos unless videos.nil?
+    @activeVideo = nil
+    @activeRow = nil
+    @searching = false
   end
 
+  def searching?
+    @searching
+  end
+
+  # inherited from Qt::AbstractListModel
   def data modelIndex, role
-    if modelIndex.is_valid and role == Qt::DisplayRole and modelIndex.row < @videos.size
-      Qt::Variant.new @videos[modelIndex.row].to_s
+    row = modelIndex.row
+
+    # show data instead of message
+    if row == @videos.size
+      palette = Qt::Palette.new
+      boldFont = Qt::Font.new
+      boldFont.bold = true
+
+      case role
+      when ItemTypeRole:
+        return ItemTypeShowMore
+      when Qt::DisplayRole, Qt::StatusTipRole:
+        if searching?
+          return i18n('Searching…')
+        elsif @videos.empty?
+          return i18n('No Videos')
+        end
+      when Qt::TextAlignmentRole:
+        return Qt::Variant( Qt::AlignHCenter | Qt::AlignVCenter )
+      when Qt::ForeGroundRole:
+        return palette.color Qt::Palette::Dark
+      when Qt::FontRole:
+        return boldFont
+      end
+    elsif include? row
+      video = @videos[row]
+
+      case role
+      when ItemTypeRole:
+        return ItemTypeVideo
+      when VideoRole:
+        return video.to_variant
+      when ActiveTrackRole:
+        return video == @activeVideo
+      when Qt::DisplayRole, Qt::StatusTipRole:
+          return video.to_s
+      end
+    end
+    Qt::Variant.new
+  end
+
+  # inherited from Qt::AbstractListModel
+  def row_count modelIndex
+    unless @videos.empty? or not searching?
+      @videos.size
     else
-      Qt::Variant.new
+      1
+    end
+  end
+  alias :rowCount :row_count
+
+  # inherited from Qt::AbstractListModel
+  def column_count modelIndex
+    4
+  end
+  alias :columnCount :column_count
+
+  # inherited from Qt::AbstractListModel
+  def remove_rows position, rows, modelIndex
+    begin_remove_rows Qt::ModelIndex.new, position, position+rows-1
+    for row in (0...rows)
+      @videos.delete_at row
+    end
+    end_remove_rows
+    reurn true
+  end
+  alias :removeRows :remove_rows
+
+  def include?
+    (0...@videos.size).include?
+  end
+
+  def [] index
+    video[index]
+  end
+
+  def active= row
+    if include? row
+      @activeRow = row
+      @activeVideo = @videos[row]
+
+      emit dataChanged(create_index(row, 0), create_index(row, column_count()-1))
+      emit active_row_changed(row)
+    else
+      @activeRow = nil
+      @activeVideo = nil
+
+  end
+
+  def next_row
+    nextRow = @activeRow + 1
+    if include? nextRow
+      nextRow
     end
   end
 
-  def rowCount modelIndex
-    @videos.size
+  def active_video
+    @activeVideo
+  end
+
+  def push video
+    connect video, SIGNAL(:got_thumbnail), self, SLOT(:update_thumbnail)
+
+    begin_insert_rows Qt::ModelIndex, @videos.size, @videos.size
+    @videos.push video
+    end_insert_rows
+
+    if @videos.size == 1
+      self.active = 0
+    end
+  end
+
+  def update_thumbnail
+    video = sender()
+    if video.class <= Video
+      row = row_for_video video
+      emit dataChanged(create_index(row, 0), create_index(row, column_count()-1))
+    else
+      qDebug 'Cannot get sender'
+    end
+  end
+
+
+  #:call-seq: => int
+  def row_for_video video
+    @videos.index video
+  end
+
+  #:call-seq: => Qt::ModelIndex
+  def index_for_video video
+    create_index @videos.index(video), 0
   end
 
 end
