@@ -40,6 +40,14 @@ class Video
     @@provider.push aProvider
   end
 
+  # contains the list with all videos
+  @@videoCollection = Hash.new do |collection,kurl|
+    if kurl.valid?
+      video =  self.get_type kurl
+      collection[kurl] = video unless video.nil?
+    end
+  end
+
   #:call-seq:
   #  accept?(KDE::Url) => bool
   #
@@ -49,35 +57,46 @@ class Video
   end
 
   #:call-seq:
-  # new(KDE::Url) => VideoProvider
+  # new(KDE::Url) => Opject of a subclass of Video
   #
   # you get a subclass back or nil
-  def self.get kurl
+  def self.get_type kurl
     @@provider.each do |aProvider|
-      if aProvider.accept? kurl
-        return aProvider.new kurl
-      end
+      video = aProvider.get_type kurl
+      return video unless video.nil?
     end
-    return false
+    return nil
   end
 
-  #:call-seq:
-  # title() => string
-  #
+  def self.get kurl
+    @@videoCollection[kurl]
+  end
+
+  def == aVideo
+    self.url == aVideo.url
+  end
+
+
   # get the title of the video
-  attr_reader :title
+  attr_accessor :title
 
   #:call-seq:
   # thumbnail_url() => KDE::Url
   #
   # get the url to the image of the thumbnail
   attr_reader :thumbnail_url
+  def thumbnail_url= kurl
+    @thumbnail_url = kurl if kurl.valid?
+  end
 
   #:call-seq:
   # video_url() => KDE::Url
   #
   # get the real video url
   attr_reader :video_url
+  def video_url= kurl
+    @video_url = kurl if kurl.valid?
+  end
 
   #:call-seq:
   # title() => KDE::Url
@@ -89,25 +108,24 @@ class Video
   # title() => string
   #
   # get the author of this video
-  attr_reader :author
+  attr_accessor :author
 
   #:call-seq:
   # duration() => Float
   #
   # get the duration in ms
-  attr_reader :duration
+  attr_accessor :duration
 
   #:method: getVideoInfo(QVariant)
   #slots 'get_video_info()'
 
   #signals 'got_video_info(QVariant)'
 
-  # Do not forget to use Video#get to create a new subclassed video object.
-  def initialize # :notnew:
+  def initialize kurl
+    @url = kurl
     @title = nil
     @thumbnail_url = nil
     @video_url = nil
-    @url = nil
     @author = nil
     @duration = nil
   end
@@ -130,19 +148,18 @@ class YoutubeVideo < Video
     @@validUrl.exact_match kurl.url
   end
 
+  def self.get_type kurl
+    self.new kurl if self.accept? kurl
+  end
+
 #   def get_video_info qvariant = nil
 #     video_url
 #
 #     emit got_video_info
 #   end
 
-  def initialize entry = nil
-    super()
-
-    [:title, :thumbnail_url, :video_url, :url, :author, :duration].each do |attr|
-      self.instance_variable_set(('@'+ attr.to_s).to_sym, entry[attr]) if entry.has_key? attr
-    end
-    puts @url.inspect
+  def initialize kurl
+    super(kurl)
   end
 
   def video_url
@@ -164,13 +181,14 @@ end
 
 Video.register_provider YoutubeVideo
 
-class Videos < Qt::AbstractListModel
+class VideoList < Qt::AbstractListModel
 
   attr_reader :videos
 
-  def initialize videos
+  def initialize videos = nil
     super()
-    @videos = videos
+    @videos = []
+    @videos = videos unless videos.nil?
   end
 
   def data modelIndex, role
@@ -333,6 +351,8 @@ class CustomWidget < KDE::MainWindow
     @listWidget.view_mode = Qt::ListView::ListMode
     dock.widget = @listWidget
     @listWidget.connect( SIGNAL('doubleClicked(const QModelIndex&)') ) do |modelIndex|
+      puts @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos.inspect
+      puts @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos[modelIndex.row].inspect
       @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos[modelIndex.row].video_url
     end
 
@@ -358,14 +378,16 @@ class CustomWidget < KDE::MainWindow
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
     end
-    videos = Videos.new( JSON.parse( body )["feed"]["entry"].collect { |entry| YoutubeVideo.new(
-      :title => entry["title"]["$t"],
-      :thumbnail_url => KDE::Url.new(entry["link"][0]["href"]),
-      :url => KDE::Url.new(entry["link"][0]["href"]),
-      :duration => entry["media$group"]["yt$duration"]["seconds"].to_f*1000,
-      :author => entry["author"][0]["name"]["$t"]
-    ) } )
-    @listWidget.model = videos
+    videos = JSON.parse( body )["feed"]["entry"].collect do |entry|
+      if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
+        video.title = entry["title"]["$t"]
+        video.thumbnail_url = KDE::Url.new(entry["link"][0]["href"])
+        video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f*1000
+        video.author = entry["author"][0]["name"]["$t"]
+        video
+      end
+    end
+    @listWidget.model = VideoList.new(videos)
   end
 
 end
