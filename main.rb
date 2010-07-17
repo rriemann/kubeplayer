@@ -34,7 +34,8 @@ end
 #
 module Kube
 
-  ItemTypeRole, VideoRole, ActiveTrackRole = *(Qt::UserRole...(Qt::UserRole+3))
+  UserRole = Qt::UserRole.to_i
+  ItemTypeRole, VideoRole, ActiveTrackRole = *(UserRole...(UserRole+3))
   ItemTypeVideo,ItemTypeShowMore = 1,2
 
 class Video < Qt::Object
@@ -387,14 +388,14 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     end
 
     @playIcon = Qt::Pixmap.new *THUMBNAIL_SIZE
+# FIXME
+=begin
     @playIcon.fill Qt::transparent
     painter = Qt::Painter.new @playIcon
-    polygon = Qt::Polygon.new
-    polygon.set_points(3,
-      PADDING*4, PADDING*4,
-      THUMBNAIL_SIZE[0]-PADDING*4, THUMBNAIL_SIZE[1]/2,
-      PADDING*4, THUMBNAIL_SIZE[1]-PADDING*2
-    )
+    polygon = Qt::PolygonF.new 3
+    polygon.setPoint 0, PADDING*4, PADDING*4
+    polygon.setPoint 1, THUMBNAIL_SIZE[0]-PADDING*4, THUMBNAIL_SIZE[1]/2
+    polygon.setPoint 2,  PADDING*4, THUMBNAIL_SIZE[1]-PADDING*2
     painter.render_hints Qt::Painter::Antialiasing, true
     painter.brush Qt::white
     pen = Qt::Pen.new
@@ -404,6 +405,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     pen.cap_style = Qt::RoundCap
     painter.pen pen
     painter.draw_polygon polygon
+=end
   end
 
   def size_hint styleOptionViewItem, modelIndex
@@ -482,9 +484,9 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.restore
 
     painter.pen(styleOptionViewItem.palette.color(Qt::Palette::Midlight))
-    painter.drawLine *THUMBNAIL_SIZE, line.width, THUMBNAIL_SIZE[1]
+    painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
     painter.pen = Qt::black unless video.thumbnail.nil?
-    painter.drawLine *THUMBNAIL_SIZE, THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
+    painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
     painter.restore
   end
 
@@ -501,7 +503,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     Qt::PointF.new *moveBy
   end
 
-  def paint_active_overlay painter, x.to_i, y.to_i, w.to_i, h.to_i
+  def paint_active_overlay painter, x, y, w, h
     palette = Qt::Palette.new
     highlightColor = palette.color Qt::Palette::Highlight
     backgroundColor = palette.color Qt::Palette::Base
@@ -510,10 +512,10 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     gradientRange = 16
 
     color2 = Qt::Color.fromHsv(highlightColor.hue,
-                               backgroundColor.saturation*(1-animation)+highlightColor.saturation*animation,
-                               backgroundColor.value*(1-animation)+highlightColor*animation)
+                               (backgroundColor.saturation*(1-animation)+highlightColor.saturation*animation).to_i,
+                               (backgroundColor.value*(1-animation)+highlightColor*animation).to_i)
     color1 = Qt::Color.fromHsv(color2.hue,[color2.saturation-gradientRange,0].max,[color2.value+gradientRange,255].min)
-    rect = Qt::Rect.new x, y, w, h
+    rect = Qt::Rect.new x.to_i, y.to_i, w.to_i, h.to_i
     painter.save
     painter.pen Qt::NoPen
     linearGradient = Qt::LinearGradient 0, 0, 0, rect.height
@@ -694,13 +696,32 @@ class MainWindow < KDE::MainWindow
     dock.windowTitle = "Clips"
     dock.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
     self.add_dock_widget Qt::LeftDockWidgetArea, dock
+
     @listWidget = Qt::ListView.new dock
-    @listWidget.view_mode = Qt::ListView::ListMode
+#     @listWidget.view_mode = Qt::ListView::ListMode
+    @listWidget.item_delegate = VideoItemDelegate.new(self)
+    @listWidget.selection_mode = Qt::AbstractItemView::ExtendedSelection
     dock.widget = @listWidget
-    @listWidget.connect( SIGNAL('doubleClicked(const QModelIndex&)') ) do |modelIndex|
-      puts @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos.inspect
-      puts @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos[modelIndex.row].inspect
-      @videoPlayer.play Phonon::MediaSource.new @listWidget.model.videos[modelIndex.row].video_url
+    @listWidget.vertical_scroll_mode = Qt::AbstractItemView::ScrollPerPixel
+    @listWidget.frame_shape = Qt::Frame::NoFrame
+    # @listWidget.attribute = Qt::WA_MacShowFocusRect, false FIXME
+    @listWidget.minimum_size = Qt::Size.new(320, 240)
+    @listWidget.uniform_item_sizes = true
+
+    @videoList =  VideoList.new
+    connect(@listWidget, SIGNAL('activated(QModelIndex)')) do |modelIndex|
+      if @videoList.include? index.row
+        @videoList.active row
+      else
+        # TODO search button
+      end
+    end
+
+    connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
+      video = @videoList[row]
+      return if video.nil?
+
+      @videoPlayer.play Phonon::MediaSource.new video.video_url
     end
 
     # add search field
@@ -725,16 +746,15 @@ class MainWindow < KDE::MainWindow
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
     end
-    videos = JSON.parse( body )["feed"]["entry"].collect do |entry|
+    JSON.parse( body )["feed"]["entry"].each do |entry|
       if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
         video.title = entry["title"]["$t"]
         video.thumbnail_url = KDE::Url.new(entry["link"][0]["href"])
         video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f*1000
         video.author = entry["author"][0]["name"]["$t"]
-        video
+        @videoList.push video
       end
     end
-    @listWidget.model = VideoList.new(videos)
   end
 
 end
