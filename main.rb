@@ -3,6 +3,7 @@
 
 require 'korundum4'
 require 'phonon'
+require 'kio'
 require 'rubygems'
 require 'json'
 require 'net/http'
@@ -14,6 +15,7 @@ require 'cgi'
 #
 # http://techbase.kde.org/Development/Languages/Ruby#Emitting_Ruby_Classes
 
+=begin
 class Object #:nodoc:
     def to_variant
         Qt::Variant.new object_id
@@ -25,6 +27,7 @@ class Qt::Variant #:nodoc:
         ObjectSpace._id2ref to_int
     end
 end
+=end
 
 # The class video is an abstract class to download, hold and organize all
 # important data. It gets subclassed by the VideoProvider classes.
@@ -32,8 +35,7 @@ end
 # The VideoProvider class is expected to reimplement #accept? and others
 #
 
-class Video
-
+class Video < Qt::Object
   # contains the list with all known providers
   @@provider = []
   def self.register_provider aProvider
@@ -80,13 +82,25 @@ class Video
   # get the title of the video
   attr_accessor :title
 
+
+  signals :got_thumbnail
+
   #:call-seq:
   # thumbnail_url() => KDE::Url
   #
   # get the url to the image of the thumbnail
   attr_reader :thumbnail_url
   def thumbnail_url= kurl
-    @thumbnail_url = kurl if kurl.valid?
+    if kurl.valid?
+      @thumbnail_url = kurl
+      job = KIO::storedGet kurl, KIO::NoReload, KIO::HideProgressInfo
+      job.connect( SIGNAL( 'result( KJob* )' ) ) do |aJob|
+        @thumbnail = Qt::Image.from_data aJob.data
+        @thumbnail.save("/tmp/test_#{(rand*1000).to_i}.png","png")
+        emit got_thumbnail
+      end
+    end
+    @thumbnail_url
   end
 
   #:call-seq:
@@ -122,9 +136,11 @@ class Video
   #signals 'got_video_info(QVariant)'
 
   def initialize kurl
+    super()
     @url = kurl
     @title = nil
     @thumbnail_url = nil
+    @thumbnail = nil
     @video_url = nil
     @author = nil
     @duration = nil
