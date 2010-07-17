@@ -219,6 +219,7 @@ class VideoList < Qt::AbstractListModel
     @activeVideo = nil
     @activeRow = nil
     @searching = false
+    @autostart = true
   end
 
   def searching?
@@ -228,7 +229,6 @@ class VideoList < Qt::AbstractListModel
   # inherited from Qt::AbstractListModel
   def data modelIndex, role
     row = modelIndex.row
-
     # show data instead of message
     if row == @videos.size
       palette = Qt::Palette.new
@@ -237,32 +237,32 @@ class VideoList < Qt::AbstractListModel
 
       case role
       when ItemTypeRole:
-        return ItemTypeShowMore
+        return Qt::Variant.new ItemTypeShowMore
       when Qt::DisplayRole, Qt::StatusTipRole:
         if searching?
-          return i18n('Searching…')
+          return Qt::Variant.new i18n('Searching…')
         elsif @videos.empty?
-          return i18n('No Videos')
+          return Qt::Variant.new i18n('No Videos')
         end
-      when Qt::TextAlignmentRole:
-        return Qt::Variant( Qt::AlignHCenter | Qt::AlignVCenter )
-      when Qt::ForeGroundRole:
-        return palette.color Qt::Palette::Dark
       when Qt::FontRole:
         return boldFont
+      when Qt::TextAlignmentRole:
+        return Qt::Variant.new(( Qt::AlignHCenter | Qt::AlignVCenter ).to_i)
+      when Qt::ForegroundRole:
+        return palette.brush(Qt::Palette::Dark)
       end
     elsif include? row
       video = @videos[row]
 
       case role
       when ItemTypeRole:
-        return ItemTypeVideo
+        return Qt::Variant.new ItemTypeVideo
       when VideoRole:
         return video.to_variant
       when ActiveTrackRole:
         return video == @activeVideo
       when Qt::DisplayRole, Qt::StatusTipRole:
-          return video.to_s
+          return Qt::Variant.new video.to_s
       end
     end
     Qt::Variant.new
@@ -335,7 +335,7 @@ class VideoList < Qt::AbstractListModel
     @videos.push video
     end_insert_rows
 
-    if @videos.size == 1
+    if @videos.size == 1 and @autostart
       self.active = 0
     end
   end
@@ -408,8 +408,9 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   alias :sizeHint :size_hint
 
   def paint painter, styleOptionViewItem, modelIndex
-    itemType = index.data(ItemTypeRole).to_i
-    if itemType == TimeTypeVideo
+    itemType = modelIndex.data(ItemTypeRole).to_i
+    if itemType == ItemTypeVideo
+      puts 'll: ' + __LINE__
       KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
       paint_body painter, styleOptionViewItem, modelIndex
     else
@@ -692,10 +693,10 @@ class MainWindow < KDE::MainWindow
     self.add_dock_widget Qt::LeftDockWidgetArea, dock
 
     @listWidget = Qt::ListView.new dock
+    dock.widget = @listWidget
 #     @listWidget.view_mode = Qt::ListView::ListMode
     @listWidget.item_delegate = VideoItemDelegate.new(self)
     @listWidget.selection_mode = Qt::AbstractItemView::ExtendedSelection
-    dock.widget = @listWidget
     @listWidget.vertical_scroll_mode = Qt::AbstractItemView::ScrollPerPixel
     @listWidget.frame_shape = Qt::Frame::NoFrame
     # @listWidget.attribute = Qt::WA_MacShowFocusRect, false FIXME
@@ -704,14 +705,16 @@ class MainWindow < KDE::MainWindow
 
     @videoList =  VideoList.new
     connect(@listWidget, SIGNAL('activated(QModelIndex)')) do |modelIndex|
-      if @videoList.include? index.row
+      if @videoList.include? modelIndex.row
         @videoList.active row
       else
         # TODO search button
       end
     end
+    @listWidget.model = @videoList
 
     connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
+      puts 'hi'
       video = @videoList[row]
       return if video.nil?
 
