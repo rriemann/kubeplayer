@@ -208,7 +208,7 @@ Video.register_provider YoutubeVideo
 class VideoList < Qt::AbstractListModel
 
   slots :update_thumbnail
-  signals 'active_row_changed(int)', 'dataChanged(int,int)'
+  signals 'active_row_changed(int)'
 
   attr_reader :videos
 
@@ -279,7 +279,7 @@ class VideoList < Qt::AbstractListModel
   alias :rowCount :row_count
 
   # inherited from Qt::AbstractListModel
-  def column_count modelIndex
+  def column_count modelIndex = nil
     4
   end
   alias :columnCount :column_count
@@ -295,12 +295,12 @@ class VideoList < Qt::AbstractListModel
   end
   alias :removeRows :remove_rows
 
-  def include?
-    (0...@videos.size).include?
+  def include? row
+    (0...@videos.size).include? row
   end
 
   def [] index
-    video[index]
+    @videos[index]
   end
 
   def active= row
@@ -331,7 +331,7 @@ class VideoList < Qt::AbstractListModel
   def push video
     connect video, SIGNAL(:got_thumbnail), self, SLOT(:update_thumbnail)
 
-    begin_insert_rows Qt::ModelIndex, @videos.size, @videos.size
+    begin_insert_rows Qt::ModelIndex.new, @videos.size, @videos.size
     @videos.push video
     end_insert_rows
 
@@ -388,24 +388,18 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     end
 
     @playIcon = Qt::Pixmap.new *THUMBNAIL_SIZE
-# FIXME
-=begin
-    @playIcon.fill Qt::transparent
+    @playIcon.fill Qt::Color.new(Qt::transparent)
     painter = Qt::Painter.new @playIcon
-    polygon = Qt::PolygonF.new 3
-    polygon.setPoint 0, PADDING*4, PADDING*4
-    polygon.setPoint 1, THUMBNAIL_SIZE[0]-PADDING*4, THUMBNAIL_SIZE[1]/2
-    polygon.setPoint 2,  PADDING*4, THUMBNAIL_SIZE[1]-PADDING*2
-    painter.render_hints Qt::Painter::Antialiasing, true
-    painter.brush Qt::white
+    polygon = Qt::Polygon.new [Qt::Point.new(PADDING*4, PADDING*4), Qt::Point.new(THUMBNAIL_SIZE[0]-PADDING*4, THUMBNAIL_SIZE[1]/2), Qt::Point.new(PADDING*4, THUMBNAIL_SIZE[1]-PADDING*2)]
+    # painter.render_hint = Qt::Painter::Antialiasing FIXME
+    painter.brush = Qt::white
     pen = Qt::Pen.new
-    pen.color = Qt::white
-    pen.width PADDING
+    pen.color = Qt::Color.new Qt::white
+    pen.width = PADDING
     pen.join_style = Qt::RoundJoin
     pen.cap_style = Qt::RoundCap
-    painter.pen pen
+    painter.pen = pen
     painter.draw_polygon polygon
-=end
   end
 
   def size_hint styleOptionViewItem, modelIndex
