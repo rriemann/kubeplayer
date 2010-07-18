@@ -232,6 +232,7 @@ class VideoList < Qt::AbstractListModel
   # inherited from Qt::AbstractListModel
   def data modelIndex, role
     row = modelIndex.row
+
     # show data instead of message
     if row == @videos.size
       palette = Qt::Palette.new
@@ -251,12 +252,14 @@ class VideoList < Qt::AbstractListModel
         return boldFont
       when Qt::TextAlignmentRole:
         return Qt::Variant.new(( Qt::AlignHCenter | Qt::AlignVCenter ).to_i)
+=begin # produces unregular crashes at startup
       when Qt::ForegroundRole:
+
         return palette.brush(Qt::Palette::Dark)
+=end
       end
     elsif include? row
       video = @videos[row]
-
       case role
       when ItemTypeRole:
         return Qt::Variant.new ItemTypeVideo
@@ -289,6 +292,7 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def remove_rows position, rows, modelIndex
+
     begin_remove_rows Qt::ModelIndex.new, position, position+rows-1
     for row in (0...rows)
       @videos.delete_at row
@@ -307,6 +311,7 @@ class VideoList < Qt::AbstractListModel
   end
 
   def active= row
+
     if include? row
       @activeRow = row
       @activeVideo = @videos[row]
@@ -332,6 +337,7 @@ class VideoList < Qt::AbstractListModel
   end
 
   def push video
+
     connect video, SIGNAL(:got_thumbnail), self, SLOT(:update_thumbnail)
 
     begin_insert_rows Qt::ModelIndex.new, @videos.size, @videos.size
@@ -356,11 +362,13 @@ class VideoList < Qt::AbstractListModel
 
   #:call-seq: => int
   def row_for_video video
+
     @videos.index video
   end
 
   #:call-seq: => Qt::ModelIndex
   def index_for_video video
+
     create_index @videos.index(video), 0
   end
 
@@ -371,6 +379,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   PADDING = 10
 
   def initialize parent
+
     super
 
 
@@ -403,6 +412,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     pen.cap_style = Qt::RoundCap
     painter.pen = pen
     painter.draw_polygon polygon
+
   end
 
   def size_hint styleOptionViewItem, modelIndex
@@ -411,12 +421,16 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   alias :sizeHint :size_hint
 
   def paint painter, styleOptionViewItem, modelIndex
+
     itemType = modelIndex.data(ItemTypeRole).to_i
     if itemType == ItemTypeVideo
+
       KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
       paint_body painter, styleOptionViewItem, modelIndex
+
     else
       super
+
     end
   end
 
@@ -427,15 +441,18 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     line = Qt::RectF.new 0, 0, styleOptionViewItem.rect.width, styleOptionViewItem.rect.height
     painter.clip_rect = line
 
+
     isActive = modelIndex.data(ActiveTrackRole).to_bool
-    isSelected = Qt::Style::State_Selected &  styleOptionViewItem.state
-=begin
+    isSelected = (Qt::Style::State_Selected & styleOptionViewItem.state) > 0
+
+    # puts Qt::Style::State_Selected.inspect + ' ' + styleOptionViewItem.state.inspect
+    # puts isActive.inspect + ' ' + isSelected.inspect
     if isActive and not isSelected
       paint_active_overlay painter, line.x, line.y, line.width, line.height
     end
-=end
 
     video = modelIndex.data(VideoRole).to_object
+    puts isSelected.inspect + " " + video.title
 
     unless video.thumbnail.nil?
       painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
@@ -450,12 +467,11 @@ class VideoItemDelegate < Qt::StyledItemDelegate
       draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
     end
 
-=begin
     painter.font = @boldFont if isActive
     fm = Qt::FontMetricsF.new painter.font
     boldMetrics = Qt::FontMetricsF.new @boldFont
 
-    painter.pen = Qt::Pen.new(styleOptionViewItem.palette.brush(isSelected ? Qt::Palette::HighlightedText : Qt::Palette::Text),0)
+    painter.pen = Qt::Pen.new(styleOptionViewItem.palette.brush(false ? Qt::Palette::HighlightedText : Qt::Palette::Text),0)
 
     title = video.title
     textBox = Qt::RectF.new line.adjusted PADDING+THUMBNAIL_SIZE[0], PADDING, -2*PADDING, -PADDING
@@ -465,6 +481,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
     painter.font = @smallerFont
 
+=begin
     published = video.published.date.to_string Qt::DefaultLocaleShortDate
     publishedSize = Qt::SizeF.new(Qt::FontMetrics.new(painter.font).size(Qt::TextSingleLine, published))
     textLocation = Qt::PointF.new PADDING+THUMBNAIL_SIZE[0], PADDING*2+textBox.height
@@ -482,11 +499,11 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_text authorTextBox, alignHints, author
     painter.restore
 
+=end
     painter.pen = styleOptionViewItem.palette.color(Qt::Palette::Midlight)
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
-    painter.pen = Qt::black unless video.thumbnail.nil?
-    painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
-=end
+    painter.pen = Qt::Color.new(Qt::black) unless video.thumbnail.nil?
+    painter.draw_line 0, THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
     painter.restore
   end
 
@@ -500,15 +517,15 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
     color2 = Qt::Color.fromHsv(highlightColor.hue,
                                (backgroundColor.saturation*(1-animation)+highlightColor.saturation*animation).to_i,
-                               (backgroundColor.value*(1-animation)+highlightColor*animation).to_i)
+                               (backgroundColor.value*(1-animation)+highlightColor.value*animation).to_i)
     color1 = Qt::Color.fromHsv(color2.hue,[color2.saturation-gradientRange,0].max,[color2.value+gradientRange,255].min)
     rect = Qt::Rect.new x.to_i, y.to_i, w.to_i, h.to_i
     painter.save
-    painter.pen Qt::NoPen
-    linearGradient = Qt::LinearGradient 0, 0, 0, rect.height
-    linearGradient.color_at 0, color1
-    linearGradient.color_at 1, color2
-    painter.brush = linearGradient
+    painter.pen = Qt::Pen.new(Qt::NoPen)
+    linearGradient = Qt::LinearGradient.new 0, 0, 0, rect.height
+    linearGradient.setColorAt(0, color1) # FIXME why not color_at= ?
+    linearGradient.setColorAt(1, color2)
+    painter.brush = Qt::Brush.new(linearGradient)
     painter.draw_rect rect
     painter.restore
   end
@@ -516,19 +533,19 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
   def draw_time painter, time, line
     timePadding = 4
-    textBox = painter.boundingRect line, Qt::AlignLeft | Qt::AlignTop, time
+    textBox = painter.bounding_rect line, Qt::AlignLeft | Qt::AlignTop, time
     textBox.adjust 0, 0, timePadding, 0
     textBox.translate THUMBNAIL_SIZE[0]-textBox.width, THUMBNAIL_SIZE[1]-textBox.height
 
     painter.save
-    painter.pen = Qt::NoPen
-    painter.brush = Qt::black
+    painter.pen = Qt::Pen.new(Qt::NoPen)
+    painter.brush = Qt::Brush.new(Qt::black)
     painter.opacity = 0.5
     painter.draw_rect textBox
     painter.restore
 
     painter.save
-    painter.pen = Qt::white
+    painter.pen = Qt::Color.new(Qt::white)
     painter.draw_text textBox, Qt::AlignCenter, time
     painter.restore
   end
@@ -696,6 +713,7 @@ class MainWindow < KDE::MainWindow
     @listWidget.uniform_item_sizes = true
 
     @videoList =  VideoList.new
+    @listWidget.model = @videoList
     connect(@listWidget, SIGNAL('activated(QModelIndex)')) do |modelIndex|
       if @videoList.include? modelIndex.row
         @videoList.active = modelIndex.row
@@ -703,7 +721,6 @@ class MainWindow < KDE::MainWindow
         # TODO search button
       end
     end
-    @listWidget.model = @videoList
 
     connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
       video = @videoList[row]
@@ -711,7 +728,9 @@ class MainWindow < KDE::MainWindow
 
       @videoPlayer.play Phonon::MediaSource.new video.video_url
     end
-
+#FIXME
+=begin
+=end
     # add search field
     @searchWidget = KDE::LineEdit.new self
     @searchWidget.clear_button_shown = true
@@ -729,7 +748,7 @@ class MainWindow < KDE::MainWindow
   end
 
   def query query, start
-    max_results = 10
+    max_results = 4
     uri = URI.parse "http://gdata.youtube.com/feeds/api/videos?q=#{CGI.escape query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
@@ -768,14 +787,14 @@ if $0 == __FILE__
 
   KDE::CmdLineArgs.init(ARGV, about)
 
-#   unless KDE::UniqueApplication.start
-#     STDERR.puts "is already running."
-#   else
-#     a = KDE::UniqueApplication.new
-#     w = CustomWidget.new
-#     a.exec
-#   end
-  a = KDE::Application.new
-  w = Kube::MainWindow.new
-  a.exec
+  unless KDE::UniqueApplication.start
+    STDERR.puts "is already running."
+  else
+    a = KDE::UniqueApplication.new
+    w = Kube::MainWindow.new
+    a.exec
+  end
+#  a = KDE::Application.new
+#  w = Kube::MainWindow.new
+#  a.exec
 end
