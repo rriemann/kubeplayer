@@ -103,8 +103,6 @@ class Video < Qt::Object
       job = KIO::storedGet kurl, KIO::NoReload, KIO::HideProgressInfo
       job.connect( SIGNAL( 'result( KJob* )' ) ) do |aJob|
         @thumbnail = Qt::Image.from_data aJob.data
-        iw = Qt::ImageWriter.new "/tmp/test_#{(rand*1000).to_i}.png"
-        iw.write @thumbnail
         emit got_thumbnail
       end
     end
@@ -275,7 +273,7 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def row_count modelIndex
-    unless @videos.empty? or not searching?
+    unless @videos.empty? # or not searching? FIXME
       @videos.size
     else
       1
@@ -369,7 +367,7 @@ class VideoList < Qt::AbstractListModel
 end
 
 class VideoItemDelegate < Qt::StyledItemDelegate
-  THUMBNAIL_SIZE = [90, 120]
+  THUMBNAIL_SIZE = [120, 90]
   PADDING = 10
 
   def initialize parent
