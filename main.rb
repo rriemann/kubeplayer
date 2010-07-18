@@ -15,16 +15,19 @@ require 'cgi'
 #
 # http://techbase.kde.org/Development/Languages/Ruby#Emitting_Ruby_Classes
 
+=begin
+=end
 class Object #:nodoc:
-    def to_variant
-        Qt::Variant.new object_id
-    end
+  def to_variant
+    puts object_id.class
+    Qt::Variant.new object_id.to_f # do not use to_f FIXME
+  end
 end
 
 class Qt::Variant #:nodoc:
-    def to_object
-        ObjectSpace._id2ref to_int
-    end
+  def to_object
+    ObjectSpace._id2ref value.to_i
+  end
 end
 
 # The class video is an abstract class to download, hold and organize all
@@ -134,13 +137,13 @@ class Video < Qt::Object
   #:call-seq:
   # duration() => Float
   #
-  # get the duration in ms
+  # get the duration in s
   attr_accessor :duration
 
   #:method: getVideoInfo(QVariant)
   #slots 'get_video_info()'
 
-  #signals 'got_video_info(QVariant)'
+  attr_reader :thumbnail
 
   def initialize kurl
     super()
@@ -150,7 +153,7 @@ class Video < Qt::Object
     @thumbnail = nil
     @video_url = nil
     @author = nil
-    @published = nil # dateTime
+    @published = Qt::DateTime.new # dateTime # FIXME
     @duration = nil
   end
 
@@ -260,7 +263,7 @@ class VideoList < Qt::AbstractListModel
       when VideoRole:
         return video.to_variant
       when ActiveTrackRole:
-        return video == @activeVideo
+        return Qt::Variant.new(video == @activeVideo)
       when Qt::DisplayRole, Qt::StatusTipRole:
           return Qt::Variant.new video.to_s
       end
@@ -410,7 +413,6 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   def paint painter, styleOptionViewItem, modelIndex
     itemType = modelIndex.data(ItemTypeRole).to_i
     if itemType == ItemTypeVideo
-      puts 'll: ' + __LINE__
       KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
       paint_body painter, styleOptionViewItem, modelIndex
     else
@@ -423,35 +425,44 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.translate styleOptionViewItem.rect.top_left
 
     line = Qt::RectF.new 0, 0, styleOptionViewItem.rect.width, styleOptionViewItem.rect.height
-    painter.clip_rect line
+    painter.clip_rect = line
 
+    puts __LINE__
     isActive = modelIndex.data(ActiveTrackRole).to_bool
-    isSelected = styleOptionViewItem.state & Qt::Style::State_Selected
-
+    puts "active: " + isActive.inspect
+    isSelected = Qt::Style::State_Selected &  styleOptionViewItem.state
+    puts __LINE__
+=begin
     if isActive and not isSelected
       paint_active_overlay painter, line.x, line.y, line.width, line.height
     end
+=end
 
-    video = modelIndex.data(VideoRole).value.to_object
+    video = modelIndex.data(VideoRole).to_object
+    puts modelIndex.data(VideoRole).inspect
+    puts video.inspect
 
     unless video.thumbnail.nil?
       painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
 
+    puts __LINE__
       paint_play_icon painter if isActive
 
-      if video.duration > 3600000 # in msec
+    puts __LINE__
+      if video.duration > 3600 # more than 1 h
         format = 'h:mm:ss'
       else
         format = 'm:ss'
       end
-      draw_time painter, Qt::Time.new.add_m_secs(time).to_string(format), line
+      draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
     end
 
+    puts __LINE__
     painter.font = @boldFont if isActive
     fm = Qt::FontMetricsF.new painter.font
     boldMetrics = Qt::FontMetricsF.new @boldFont
 
-    painter.pen(Qt::Pen.new(styleOptionViewItem.palette.brush(isSelected ? Qt::Palette::HighlightedText : Qt::Palette::Text),0))
+    painter.pen = Qt::Pen.new(styleOptionViewItem.palette.brush(isSelected ? Qt::Palette::HighlightedText : Qt::Palette::Text),0)
 
     title = video.title
     textBox = Qt::RectF.new line.adjusted PADDING+THUMBNAIL_SIZE[0], PADDING, -2*PADDING, -PADDING
@@ -478,7 +489,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_text authorTextBox, alignHints, author
     painter.restore
 
-    painter.pen(styleOptionViewItem.palette.color(Qt::Palette::Midlight))
+    painter.pen = styleOptionViewItem.palette.color(Qt::Palette::Midlight)
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
     painter.pen = Qt::black unless video.thumbnail.nil?
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
@@ -543,7 +554,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
   def paint_play_icon painter
     painter.save
-    painter.opacity 0.5
+    painter.opacity = 0.5
     painter.draw_pixmap @playIcon.rect, @playIcon
     painter.restore
   end
@@ -714,7 +725,6 @@ class MainWindow < KDE::MainWindow
     @listWidget.model = @videoList
 
     connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
-      puts 'hi'
       video = @videoList[row]
       return if video.nil?
 
@@ -747,7 +757,7 @@ class MainWindow < KDE::MainWindow
       if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
         video.title = entry["title"]["$t"]
         video.thumbnail_url = KDE::Url.new(entry["link"][0]["href"])
-        video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f*1000
+        video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
         video.author = entry["author"][0]["name"]["$t"]
         @videoList.push video
       end
