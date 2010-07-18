@@ -424,13 +424,10 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
     itemType = modelIndex.data(ItemTypeRole).to_i
     if itemType == ItemTypeVideo
-
       KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
       paint_body painter, styleOptionViewItem, modelIndex
-
     else
       super
-
     end
   end
 
@@ -443,7 +440,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
 
     isActive = modelIndex.data(ActiveTrackRole).to_bool
-    isSelected = (Qt::Style::State_Selected & styleOptionViewItem.state) > 0
+    isSelected = !((Qt::Style::State_Selected.to_i & styleOptionViewItem.state) > 0)
 
     # puts Qt::Style::State_Selected.inspect + ' ' + styleOptionViewItem.state.inspect
     # puts isActive.inspect + ' ' + isSelected.inspect
@@ -452,7 +449,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     end
 
     video = modelIndex.data(VideoRole).to_object
-    puts isSelected.inspect + " " + video.title
+    #puts isSelected.inspect + " " + video.title
 
     unless video.thumbnail.nil?
       painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
@@ -748,7 +745,7 @@ class MainWindow < KDE::MainWindow
   end
 
   def query query, start
-    max_results = 4
+    max_results = 10
     uri = URI.parse "http://gdata.youtube.com/feeds/api/videos?q=#{CGI.escape query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
