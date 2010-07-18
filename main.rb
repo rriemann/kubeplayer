@@ -19,7 +19,6 @@ require 'cgi'
 =end
 class Object #:nodoc:
   def to_variant
-    puts object_id.class
     Qt::Variant.new object_id.to_f # do not use to_f FIXME
   end
 end
@@ -80,9 +79,11 @@ class Video < Qt::Object
     @@videoCollection[kurl]
   end
 
+=begin
   def == aVideo
     self.url == aVideo.url
   end
+=end
 
 
   # get the title of the video
@@ -102,7 +103,8 @@ class Video < Qt::Object
       job = KIO::storedGet kurl, KIO::NoReload, KIO::HideProgressInfo
       job.connect( SIGNAL( 'result( KJob* )' ) ) do |aJob|
         @thumbnail = Qt::Image.from_data aJob.data
-        @thumbnail.save("/tmp/test_#{(rand*1000).to_i}.png","png")
+        iw = Qt::ImageWriter.new "/tmp/test_#{(rand*1000).to_i}.png"
+        iw.write @thumbnail
         emit got_thumbnail
       end
     end
@@ -222,7 +224,7 @@ class VideoList < Qt::AbstractListModel
     @activeVideo = nil
     @activeRow = nil
     @searching = false
-    @autostart = true
+    @autostart = false
   end
 
   def searching?
@@ -427,11 +429,8 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     line = Qt::RectF.new 0, 0, styleOptionViewItem.rect.width, styleOptionViewItem.rect.height
     painter.clip_rect = line
 
-    puts __LINE__
     isActive = modelIndex.data(ActiveTrackRole).to_bool
-    puts "active: " + isActive.inspect
     isSelected = Qt::Style::State_Selected &  styleOptionViewItem.state
-    puts __LINE__
 =begin
     if isActive and not isSelected
       paint_active_overlay painter, line.x, line.y, line.width, line.height
@@ -439,16 +438,12 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 =end
 
     video = modelIndex.data(VideoRole).to_object
-    puts modelIndex.data(VideoRole).inspect
-    puts video.inspect
 
     unless video.thumbnail.nil?
       painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
 
-    puts __LINE__
-      paint_play_icon painter if isActive
+      # paint_play_icon painter if isActive FIXME
 
-    puts __LINE__
       if video.duration > 3600 # more than 1 h
         format = 'h:mm:ss'
       else
@@ -457,7 +452,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
       draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
     end
 
-    puts __LINE__
+=begin
     painter.font = @boldFont if isActive
     fm = Qt::FontMetricsF.new painter.font
     boldMetrics = Qt::FontMetricsF.new @boldFont
@@ -493,20 +488,8 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
     painter.pen = Qt::black unless video.thumbnail.nil?
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
+=end
     painter.restore
-  end
-
-  def center_image pixmap, rect
-    pixmapRatio = pixmap.width / pixmap.height
-    moveBy = [0, 0]
-
-    if pixmapRatio < 1
-      moveBy[0] = (rect.width-(rect.height*pixmapRatio))/2.0
-    else
-      moveBy[1] = (rect.height-(rect.width/pixmapRatio))/2.0
-    end
-
-    Qt::PointF.new *moveBy
   end
 
   def paint_active_overlay painter, x, y, w, h
@@ -717,7 +700,7 @@ class MainWindow < KDE::MainWindow
     @videoList =  VideoList.new
     connect(@listWidget, SIGNAL('activated(QModelIndex)')) do |modelIndex|
       if @videoList.include? modelIndex.row
-        @videoList.active row
+        @videoList.active = modelIndex.row
       else
         # TODO search button
       end
@@ -756,7 +739,7 @@ class MainWindow < KDE::MainWindow
     JSON.parse( body )["feed"]["entry"].each do |entry|
       if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
         video.title = entry["title"]["$t"]
-        video.thumbnail_url = KDE::Url.new(entry["link"][0]["href"])
+        video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
         video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
         video.author = entry["author"][0]["name"]["$t"]
         @videoList.push video
