@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # kate: remove-trailing-space on; replace-trailing-space-save on; indent-width 2; indent-mode ruby; syntax ruby;
 
+$KCODE = 'u'
+
 require 'korundum4'
 require 'phonon'
 require 'kio'
@@ -233,41 +235,16 @@ class VideoList < Qt::AbstractListModel
   def data modelIndex, role
     row = modelIndex.row
 
-    # show data instead of message
-    if row == @videos.size
-      palette = Qt::Palette.new
-      boldFont = Qt::Font.new
-      boldFont.bold = true
-
-      case role
-      when ItemTypeRole:
-        return Qt::Variant.new ItemTypeShowMore
-      when Qt::DisplayRole, Qt::StatusTipRole:
-        if searching?
-          return Qt::Variant.new i18n('Searching…')
-        elsif @videos.empty?
-          return Qt::Variant.new i18n('No Videos')
-        end
-      when Qt::FontRole:
-        return boldFont
-      when Qt::TextAlignmentRole:
-        return Qt::Variant.new(( Qt::AlignHCenter | Qt::AlignVCenter ).to_i)
-=begin # produces unregular crashes at startup
-      when Qt::ForegroundRole:
-
-        return palette.brush(Qt::Palette::Dark)
-=end
-      end
-    elsif include? row
+    if include? row
       video = @videos[row]
       case role
-      when ItemTypeRole:
+      when ItemTypeRole then
         return Qt::Variant.new ItemTypeVideo
-      when VideoRole:
+      when VideoRole then
         return video.to_variant
-      when ActiveTrackRole:
+      when ActiveTrackRole then
         return Qt::Variant.new(video == @activeVideo)
-      when Qt::DisplayRole, Qt::StatusTipRole:
+      when Qt::DisplayRole, Qt::StatusTipRole then
           return Qt::Variant.new video.to_s
       end
     end
@@ -276,11 +253,7 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def row_count modelIndex
-    unless @videos.empty? # or not searching? FIXME
-      @videos.size
-    else
-      1
-    end
+    @videos.size
   end
   alias :rowCount :row_count
 
@@ -292,7 +265,6 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def remove_rows position, rows, modelIndex
-
     begin_remove_rows Qt::ModelIndex.new, position, position+rows-1
     for row in (0...rows)
       @videos.delete_at row
@@ -322,7 +294,6 @@ class VideoList < Qt::AbstractListModel
       @activeRow = nil
       @activeVideo = nil
     end
-
   end
 
   def next_row
@@ -337,7 +308,6 @@ class VideoList < Qt::AbstractListModel
   end
 
   def push video
-
     connect video, SIGNAL(:got_thumbnail), self, SLOT(:update_thumbnail)
 
     begin_insert_rows Qt::ModelIndex.new, @videos.size, @videos.size
@@ -362,13 +332,11 @@ class VideoList < Qt::AbstractListModel
 
   #:call-seq: => int
   def row_for_video video
-
     @videos.index video
   end
 
   #:call-seq: => Qt::ModelIndex
   def index_for_video video
-
     create_index @videos.index(video), 0
   end
 
@@ -381,7 +349,6 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   def initialize parent
 
     super
-
 
     @boldFont = Qt::Font.new
     @boldFont.bold = true
@@ -412,7 +379,6 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     pen.cap_style = Qt::RoundCap
     painter.pen = pen
     painter.draw_polygon polygon
-
   end
 
   def size_hint styleOptionViewItem, modelIndex
@@ -421,7 +387,6 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   alias :sizeHint :size_hint
 
   def paint painter, styleOptionViewItem, modelIndex
-
     itemType = modelIndex.data(ItemTypeRole).to_i
     if itemType == ItemTypeVideo
       KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
@@ -440,11 +405,11 @@ class VideoItemDelegate < Qt::StyledItemDelegate
 
 
     isActive = modelIndex.data(ActiveTrackRole).to_bool
-    isSelected = !((Qt::Style::State_Selected.to_i & styleOptionViewItem.state) > 0)
+    # isSelected = !((Qt::Style::State_Selected.to_i & styleOptionViewItem.state) > 0)
 
     # puts Qt::Style::State_Selected.inspect + ' ' + styleOptionViewItem.state.inspect
     # puts isActive.inspect + ' ' + isSelected.inspect
-    if isActive and not isSelected
+    if isActive
       paint_active_overlay painter, line.x, line.y, line.width, line.height
     end
 
