@@ -1,8 +1,7 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env ruby1.9
 # kate: remove-trailing-space on; replace-trailing-space-save on; indent-width 2; indent-mode ruby; syntax ruby;
 
-$KCODE = 'u'
-
+$i = -1
 require 'korundum4'
 require 'phonon'
 require 'kio'
@@ -10,26 +9,6 @@ require 'rubygems'
 require 'json'
 require 'net/http'
 require 'cgi'
-
-
-# Object and Qt::Variant needs to be extended to allow the emitting of ruby
-# objects
-#
-# http://techbase.kde.org/Development/Languages/Ruby#Emitting_Ruby_Classes
-
-=begin
-=end
-class Object #:nodoc:
-  def to_variant
-    Qt::Variant.new object_id.to_f # do not use to_f FIXME
-  end
-end
-
-class Qt::Variant #:nodoc:
-  def to_object
-    ObjectSpace._id2ref value.to_i
-  end
-end
 
 # The class video is an abstract class to download, hold and organize all
 # important data. It gets subclassed by the VideoProvider classes.
@@ -233,16 +212,20 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def data modelIndex, role
+    puts __LINE__
     row = modelIndex.row
-
     if include? row
       video = @videos[row]
       case role
-      when ItemTypeRole then
-        return Qt::Variant.new ItemTypeVideo
       when VideoRole then
-        return video.to_variant
+        $i += 1
+        puts "# " + $i.to_s
+        puts "before: " + video.object_id.to_s
+        var = Qt::Variant.from_value video
+        puts "transfer"
+        return var
       when ActiveTrackRole then
+        puts __LINE__
         return Qt::Variant.new(video == @activeVideo)
       when Qt::DisplayRole, Qt::StatusTipRole then
           return Qt::Variant.new video.to_s
@@ -387,13 +370,9 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   alias :sizeHint :size_hint
 
   def paint painter, styleOptionViewItem, modelIndex
-    itemType = modelIndex.data(ItemTypeRole).to_i
-    if itemType == ItemTypeVideo
-      KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
-      paint_body painter, styleOptionViewItem, modelIndex
-    else
-      super
-    end
+    puts __LINE__
+    KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
+    paint_body painter, styleOptionViewItem, modelIndex
   end
 
   def paint_body painter, styleOptionViewItem, modelIndex
@@ -412,13 +391,14 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     if isActive
       paint_active_overlay painter, line.x, line.y, line.width, line.height
     end
-
-    video = modelIndex.data(VideoRole).to_object
+    video = modelIndex.data(VideoRole).value
+    puts "after: " + video.object_id.to_s
     #puts isSelected.inspect + " " + video.title
 
     unless video.thumbnail.nil?
+      puts __LINE__
       painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
-
+      puts __LINE__
       # paint_play_icon painter if isActive FIXME
 
       if video.duration > 3600 # more than 1 h
@@ -426,7 +406,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
       else
         format = 'm:ss'
       end
-      draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
+      # draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
     end
 
     painter.font = @boldFont if isActive
@@ -441,9 +421,8 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     textBox = painter.boundingRect textBox, alignHints, title
     painter.draw_text textBox, alignHints, title
 
-    painter.font = @smallerFont
-
 =begin
+    painter.font = @smallerFont
     published = video.published.date.to_string Qt::DefaultLocaleShortDate
     publishedSize = Qt::SizeF.new(Qt::FontMetrics.new(painter.font).size(Qt::TextSingleLine, published))
     textLocation = Qt::PointF.new PADDING+THUMBNAIL_SIZE[0], PADDING*2+textBox.height
@@ -461,12 +440,13 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_text authorTextBox, alignHints, author
     painter.restore
 
-=end
     painter.pen = styleOptionViewItem.palette.color(Qt::Palette::Midlight)
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
     painter.pen = Qt::Color.new(Qt::black) unless video.thumbnail.nil?
     painter.draw_line 0, THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
+=end
     painter.restore
+    puts __LINE__
   end
 
   def paint_active_overlay painter, x, y, w, h
@@ -706,6 +686,7 @@ class MainWindow < KDE::MainWindow
 #     video_url = '/home/rriemann/Documents/Videos/Player/Austin_Powers_Goldstaender_08.08.15_20-15_rtl2_115_TVOON_DE.mpg.mp4-cut.avi'
     # @videoPlayer.play Phonon::MediaSource.new video_url
 
+    @searchWidget.focus = Qt::OtherFocusReason
     self.show
   end
 
@@ -749,14 +730,14 @@ if $0 == __FILE__
 
   KDE::CmdLineArgs.init(ARGV, about)
 
-  unless KDE::UniqueApplication.start
-    STDERR.puts "is already running."
-  else
-    a = KDE::UniqueApplication.new
-    w = Kube::MainWindow.new
-    a.exec
-  end
-#  a = KDE::Application.new
-#  w = Kube::MainWindow.new
-#  a.exec
+#   unless KDE::UniqueApplication.start
+#     STDERR.puts "is already running."
+#   else
+#     a = KDE::UniqueApplication.new
+#     w = Kube::MainWindow.new
+#     a.exec
+#   end
+ a = KDE::Application.new
+ w = Kube::MainWindow.new
+ a.exec
 end
