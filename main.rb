@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby1.9
 # kate: remove-trailing-space on; replace-trailing-space-save on; indent-width 2; indent-mode ruby; syntax ruby;
 
-$i = -1
 require 'korundum4'
 require 'phonon'
 require 'kio'
@@ -71,7 +70,7 @@ class Video < Qt::Object
   attr_accessor :title
 
 
-  signals :got_thumbnail
+  signals :got_thumbnail, :got_video_url
 
   #:call-seq:
   # thumbnail_url() => KDE::Url
@@ -81,13 +80,19 @@ class Video < Qt::Object
   def thumbnail_url= kurl
     if kurl.valid?
       @thumbnail_url = kurl
-      job = KIO::storedGet kurl, KIO::NoReload, KIO::HideProgressInfo
-      job.connect( SIGNAL( 'result( KJob* )' ) ) do |aJob|
-        @thumbnail = Qt::Image.from_data aJob.data
-        emit got_thumbnail
+      job = KIO::storedGet kurl , KIO::NoReload, KIO::HideProgressInfo
+      connect(job, SIGNAL( 'result( KJob* )' )) do |aJob|
+        if aJob.error == 0
+          @thumbnail = Qt::Image.from_data aJob.data
+          emit got_thumbnail
+        else
+          qDebug 'Warning: loading thumbnail failed for' + @url + ' : ' + @thumbnail_url
+        end
       end
     end
-    @thumbnail_url
+  end
+
+  def thumbnail_job_result aJob
   end
 
   #:call-seq:
@@ -149,6 +154,7 @@ end
 class YoutubeVideo < Video
 
   @@validUrl = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
+  INFO_REQUEST  = 'http://www.youtube.com/get_video_info?&video_id=%s&el=embedded&ps=default&eurl=&gl=US&hl=en'
 
   #:call-seq:
   #  accept?(KDE::Url) => bool
@@ -170,20 +176,37 @@ class YoutubeVideo < Video
     super(kurl)
   end
 
+
+  # http://eduviews.com/portal/getting-youtube-video-url
   def video_url
     unless @video_url == false
-      is_hd = false
-      video_url = 'http://www.youtube.com/get_video?'
-      video_url += 'video_id=' + @url.url.match(/\bv=([^&]+)/)[1]
-      uri = URI.parse @url.url
-      response, body = Net::HTTP.start(uri.host, uri.port) do |http|
-        http.get(uri.path+'?'+uri.query)
+      @id = @url.url.match(/\bv=([^&]+)/)[1]
+      infoRequestUrl = KDE::Url.new (INFO_REQUEST % @id)
+#       infoRequestUrl.add_query_item 'video_id', @id
+      infoRequestJob = KIO::storedGet infoRequestUrl , KIO::NoReload, KIO::HideProgressInfo
+      connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
+        metaInfo = {}
+        aJob.data.data.split('&').each do |s|
+          match = /=/.match s
+          metaInfo[match.pre_match.to_sym] = KDE::Url::fromPercentEncoding(Qt::ByteArray.new match.post_match)
+        end
+        @token = metaInfo[:token]
+        # @id = metaInfo[:video_id]
+        @fmtUrlMap = Hash[*metaInfo[:fmt_url_map].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match] }.flatten]
+	videoRequestJob = KIO::mimetype KDE::Url.new @fmtUrlMap.max[1]
+        # videoRequestJob.addMetaData 'PropagateHttpHeader', 'true'
+        connect(videoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
+	  # aJob.queryMetaData 'HTTP-Headers'
+          if /^video\//.match(aJob.mimetype)
+	    @video_url = aJob.url
+	    emit got_video_url
+	  else
+	    @video_url = false
+	  end
+        end
       end
-      video_url += '&t=' + body.match(/\bt=([^&]+)/)[1]
-      video_url += '&fmt=' + (is_hd ? '22' : '18')
-      @video_url = KDE::Url::decode_string video_url
     end
-    @video_url
+    emit got_video_url
   end
 end
 
@@ -193,6 +216,7 @@ class VideoList < Qt::AbstractListModel
 
   slots :update_thumbnail
   signals 'active_row_changed(int)'
+  signals 'play_this(KUrl*)'
 
   attr_reader :videos
 
@@ -212,25 +236,22 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def data modelIndex, role
-    puts __LINE__
+    puts __LINE__ if $DEBUG
     row = modelIndex.row
     if include? row
       video = @videos[row]
       case role
       when VideoRole then
-        $i += 1
-        puts "# " + $i.to_s
-        puts "before: " + video.object_id.to_s
-        var = Qt::Variant.from_value video
-        puts "transfer"
-        return var
+        return Qt::Variant.from_value video
       when ActiveTrackRole then
-        puts __LINE__
+        puts __LINE__ if $DEBUG
         return Qt::Variant.new(video == @activeVideo)
       when Qt::DisplayRole, Qt::StatusTipRole then
+          puts __LINE__ if $DEBUG
           return Qt::Variant.new video.to_s
       end
     end
+    puts __LINE__.to_s + " " + role.inspect if $DEBUG
     Qt::Variant.new
   end
 
@@ -370,8 +391,9 @@ class VideoItemDelegate < Qt::StyledItemDelegate
   alias :sizeHint :size_hint
 
   def paint painter, styleOptionViewItem, modelIndex
-    puts __LINE__
+    puts __LINE__ if $DEBUG
     KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
+    video = modelIndex.data(VideoRole).value
     paint_body painter, styleOptionViewItem, modelIndex
   end
 
@@ -392,13 +414,12 @@ class VideoItemDelegate < Qt::StyledItemDelegate
       paint_active_overlay painter, line.x, line.y, line.width, line.height
     end
     video = modelIndex.data(VideoRole).value
-    puts "after: " + video.object_id.to_s
     #puts isSelected.inspect + " " + video.title
 
     unless video.thumbnail.nil?
-      puts __LINE__
+      puts __LINE__ if $DEBUG
       painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
-      puts __LINE__
+      puts __LINE__ if $DEBUG
       # paint_play_icon painter if isActive FIXME
 
       if video.duration > 3600 # more than 1 h
@@ -446,7 +467,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_line 0, THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
 =end
     painter.restore
-    puts __LINE__
+    puts __LINE__ if $DEBUG
   end
 
   def paint_active_overlay painter, x, y, w, h
@@ -666,13 +687,12 @@ class MainWindow < KDE::MainWindow
 
     connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
       video = @videoList[row]
-      return if video.nil?
-
-      @videoPlayer.play Phonon::MediaSource.new video.video_url
     end
-#FIXME
-=begin
-=end
+
+    connect(@videoList, SIGNAL('play_this(KUrl*)')) do |kurl|
+      @videoPlayer.play Phonon::MediaSource.new kurl
+    end
+
     # add search field
     @searchWidget = KDE::LineEdit.new self
     @searchWidget.clear_button_shown = true
@@ -691,7 +711,7 @@ class MainWindow < KDE::MainWindow
   end
 
   def query query, start
-    max_results = 10
+    max_results = 25
     uri = URI.parse "http://gdata.youtube.com/feeds/api/videos?q=#{CGI.escape query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
     response, body = Net::HTTP.start(uri.host, uri.port) do |http|
       http.get(uri.path+'?'+uri.query)
@@ -700,6 +720,7 @@ class MainWindow < KDE::MainWindow
       if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
         video.title = entry["title"]["$t"]
         video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
+        puts entry["media$group"]["media$thumbnail"][-1]["url"]
         video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
         video.author = entry["author"][0]["name"]["$t"]
         @videoList.push video
