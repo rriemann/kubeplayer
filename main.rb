@@ -8,6 +8,7 @@ require 'rubygems'
 require 'json'
 require 'net/http'
 require 'cgi'
+require 'pp'
 
 # The class video is an abstract class to download, hold and organize all
 # important data. It gets subclassed by the VideoProvider classes.
@@ -70,7 +71,7 @@ class Video < Qt::Object
   attr_accessor :title
 
 
-  signals :got_thumbnail, :got_video_url
+  signals :got_thumbnail, 'got_video_url(QVariant)'
 
   #:call-seq:
   # thumbnail_url() => KDE::Url
@@ -95,11 +96,6 @@ class Video < Qt::Object
   def thumbnail_job_result aJob
   end
 
-  #:call-seq:
-  # video_url() => KDE::Url
-  #
-  # get the real video url
-  attr_reader :video_url
   def video_url= kurl
     @video_url = kurl if kurl.valid?
   end
@@ -130,6 +126,8 @@ class Video < Qt::Object
   #slots 'get_video_info()'
 
   attr_reader :thumbnail
+
+  attr_reader :video_url
 
   def initialize kurl
     super()
@@ -178,8 +176,9 @@ class YoutubeVideo < Video
 
 
   # http://eduviews.com/portal/getting-youtube-video-url
-  def video_url
+  def request_video_url
     unless @video_url == false
+      @video_url = false
       @id = @url.url.match(/\bv=([^&]+)/)[1]
       infoRequestUrl = KDE::Url.new (INFO_REQUEST % @id)
 #       infoRequestUrl.add_query_item 'video_id', @id
@@ -193,20 +192,23 @@ class YoutubeVideo < Video
         @token = metaInfo[:token]
         # @id = metaInfo[:video_id]
         @fmtUrlMap = Hash[*metaInfo[:fmt_url_map].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match] }.flatten]
+	@video_url = KDE::Url.new @fmtUrlMap.max[1]
+	emit got_video_url(Qt::Variant.from_value(self))
+=begin
 	videoRequestJob = KIO::mimetype KDE::Url.new @fmtUrlMap.max[1]
         # videoRequestJob.addMetaData 'PropagateHttpHeader', 'true'
         connect(videoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
 	  # aJob.queryMetaData 'HTTP-Headers'
           if /^video\//.match(aJob.mimetype)
 	    @video_url = aJob.url
-	    emit got_video_url
-	  else
-	    @video_url = false
+	    emit got_video_url @video_url
 	  end
         end
+=end
       end
+    else
+      emit got_video_url(Qt::Variant.from_value(self))
     end
-    emit got_video_url
   end
 end
 
@@ -216,7 +218,7 @@ class VideoList < Qt::AbstractListModel
 
   slots :update_thumbnail
   signals 'active_row_changed(int)'
-  signals 'play_this(KUrl*)'
+  signals 'play_this(QVariant)'
 
   attr_reader :videos
 
@@ -313,6 +315,9 @@ class VideoList < Qt::AbstractListModel
 
   def push video
     connect video, SIGNAL(:got_thumbnail), self, SLOT(:update_thumbnail)
+    connect(video, SIGNAL('got_video_url(QVariant)')) do |variant|
+      emit play_this(variant)
+    end
 
     begin_insert_rows Qt::ModelIndex.new, @videos.size, @videos.size
     @videos.push video
@@ -687,10 +692,16 @@ class MainWindow < KDE::MainWindow
 
     connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
       video = @videoList[row]
+      @active_video = video
+      video.request_video_url
     end
 
-    connect(@videoList, SIGNAL('play_this(KUrl*)')) do |kurl|
-      @videoPlayer.play Phonon::MediaSource.new kurl
+    connect(@videoList, SIGNAL('play_this(QVariant)')) do |variant|
+      video = variant.value
+      if @active_video == video
+	pp video
+	@videoPlayer.play Phonon::MediaSource.new video.video_url
+      end
     end
 
     # add search field
@@ -720,7 +731,6 @@ class MainWindow < KDE::MainWindow
       if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
         video.title = entry["title"]["$t"]
         video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
-        puts entry["media$group"]["media$thumbnail"][-1]["url"]
         video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
         video.author = entry["author"][0]["name"]["$t"]
         @videoList.push video
