@@ -534,13 +534,16 @@ class MainWindow < KDE::MainWindow
   end
 
   def stateChanged state, stateBefore
-    if state == Phonon::PlayingState
+    case state
+    when Phonon::PlayingState then
       @seekSlider.mediaObject = @videoPlayer.mediaObject
       @playPauseAction.checked = true
       @playPauseAction.enabled = true
-    elsif state == Phonon::PausedState
+    when Phonon::PausedState then
       @playPauseAction.checked = false
       @playPauseAction.enabled = true
+    when Phonon::ErrorState then
+      qDebug 'Phonon Error: ' + @videoPlayer.media_object.error_string + ' (' + @videoPlayer.media_object.error_type.to_s + ')'
     else
       @playPauseAction.enabled = false # unless state == Phonon::BufferingState
     end
@@ -699,8 +702,19 @@ class MainWindow < KDE::MainWindow
     connect(@videoList, SIGNAL('play_this(QVariant)')) do |variant|
       video = variant.value
       if @active_video == video
-	pp video
-	@videoPlayer.play Phonon::MediaSource.new video.video_url
+	qDebug 'Start download: ' + video.video_url.url
+	job = KIO::storedGet video.video_url , KIO::NoReload # , KIO::HideProgressInfo
+	job.addMetaData 'PropagateHttpHeader', 'true'
+	connect(job, SIGNAL( 'result( KJob* )' )) do |aJob|
+	  qDebug aJob.queryMetaData 'HTTP-Headers'
+	  file = KDE::TemporaryFile.new
+	  file.suffix = '.fla'
+	  file.open
+	  file.write aJob.data
+	  file.close
+	  puts file.file_name
+	  @videoPlayer.play Phonon::MediaSource.new KDE::Url.new file.file_name
+	end
       end
     end
 
