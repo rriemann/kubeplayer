@@ -267,12 +267,6 @@ class VideoList < Qt::AbstractListModel
   alias :rowCount :row_count
 
   # inherited from Qt::AbstractListModel
-  def column_count modelIndex = nil
-    4
-  end
-  alias :columnCount :column_count
-
-  # inherited from Qt::AbstractListModel
   def remove_rows position, rows, modelIndex
     begin_remove_rows Qt::ModelIndex.new, position, position+rows-1
     for row in (0...rows)
@@ -358,11 +352,10 @@ class VideoList < Qt::AbstractListModel
     create_index @videos.index(video), 0
   end
 
-  def query query, start
-    puts __LINE__ if $DEBUG
-    self.clear if start == 0
-    puts __LINE__ if $DEBUG
-    @provider.query self, query, start
+  def query query = nil
+    self.clear unless query == @query
+    @query = query unless query.nil?
+    @provider.query self, @query, @videos.size unless @query.nil?
   end
 
 end
@@ -692,7 +685,7 @@ class MainWindow < KDE::MainWindow
     dock.widget = @listWidget
 #     @listWidget.view_mode = Qt::ListView::ListMode
     @listWidget.item_delegate = VideoItemDelegate.new(self)
-    @listWidget.selection_mode = Qt::AbstractItemView::ExtendedSelection
+    # @listWidget.selection_mode = Qt::AbstractItemView::ExtendedSelection
     @listWidget.vertical_scroll_mode = Qt::AbstractItemView::ScrollPerPixel
     @listWidget.frame_shape = Qt::Frame::NoFrame
     # @listWidget.attribute = Qt::WA_MacShowFocusRect, false FIXME
@@ -706,6 +699,13 @@ class MainWindow < KDE::MainWindow
         @videoList.active = modelIndex.row
       else
         # TODO search button
+      end
+    end
+
+    @listWidget.vertical_scroll_bar.tracking = true
+    connect(@listWidget.vertical_scroll_bar, SIGNAL('valueChanged(int)')) do |pos|
+      if @listWidget.vertical_scroll_bar.maximum == pos
+        @videoList.query
       end
     end
 
@@ -726,7 +726,7 @@ class MainWindow < KDE::MainWindow
     @searchWidget = KDE::LineEdit.new self
     @searchWidget.clear_button_shown = true
     @searchWidget.connect( SIGNAL :returnPressed ) do
-      @videoList.query @searchWidget.text, 0
+      @videoList.query @searchWidget.text
       @searchWidget.clear
     end
     controlBar.add_widget @searchWidget
