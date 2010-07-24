@@ -154,6 +154,9 @@ class YoutubeVideo < Video
   @@validUrl = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
   INFO_REQUEST  = 'http://www.youtube.com/get_video_info?&video_id=%s&el=embedded&ps=default&eurl=&gl=US&hl=en'
   VIDEO_URL     = 'http://www.youtube.com/watch'
+  HEADER        = {
+    'cookies' => 'none'
+  }
 
   #:call-seq:
   #  accept?(KDE::Url) => bool
@@ -180,33 +183,21 @@ class YoutubeVideo < Video
   def request_video_url
     unless @video_url == false
       @video_url = false
-      uri = URI.parse @url.url
-      response, body = Net::HTTP.start(uri.host, uri.port) do |http|
-        http.get(uri.path+'?'+uri.query)
-      end
-      match = /^\s*var swfConfig = (.+);$/.match body
 
-=begin
-      @id = @url.url.match(/\bv=([^&]+)/)[1]
-      infoRequestUrl = KDE::Url.new VIDEO_URL
-      infoRequestUrl.add_query_item 'v', @id
-      infoRequestJob = KIO::storedGet infoRequestUrl , KIO::NoReload, KIO::HideProgressInfo
+      infoRequestJob = KIO::storedGet @url , KIO::NoReload, KIO::HideProgressInfo
+      HEADER.each do |key, val|
+        infoRequestJob.addMetaData key, val
+      end
       connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
         match = /^\s*var swfConfig = (.+);$/.match aJob.data.data
-        puts aJob.url.url
-        puts match[0]
         @fmtUrlMap = Hash[*JSON.parse(match[1])['args']['fmt_url_map'].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match.gsub(/ip=0\.0\.0\.0/,'ip=91.0.0.0')] }.flatten]
+        pp @fmtUrlMap
         @video_url = KDE::Url.new @fmtUrlMap.max[1]
-        puts @video_url.url
-         KDE::Application.instance.quit
 
         emit got_video_url(Qt::Variant.from_value(self))
       end
-=end
-      @fmtUrlMap = Hash[*JSON.parse(match[1])['args']['fmt_url_map'].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match.gsub(/ip=0\.0\.0\.0/,'ip=91.0.0.0')] }.flatten]
-      @video_url = KDE::Url.new @fmtUrlMap.max[1]
     end
-    emit got_video_url(Qt::Variant.from_value(self))
+    # emit got_video_url(Qt::Variant.from_value(self))
   end
 end
 =begin
