@@ -181,51 +181,26 @@ class YoutubeVideo < Video
 
   # http://eduviews.com/portal/getting-youtube-video-url
   def request_video_url
-    unless @video_url == false
+    if @video_url == nil
       @video_url = false
 
       infoRequestJob = KIO::storedGet @url , KIO::NoReload, KIO::HideProgressInfo
       HEADER.each do |key, val|
         infoRequestJob.addMetaData key, val
       end
+      infoRequestJob.add_meta_data 'cookies', 'none'
       connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
         match = /^\s*var swfConfig = (.+);$/.match aJob.data.data
         @fmtUrlMap = Hash[*JSON.parse(match[1])['args']['fmt_url_map'].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match.gsub(/ip=0\.0\.0\.0/,'ip=91.0.0.0')] }.flatten]
-        pp @fmtUrlMap
         @video_url = KDE::Url.new @fmtUrlMap.max[1]
 
         emit got_video_url(Qt::Variant.from_value(self))
       end
+    elsif @video_url != false
+      emit got_video_url(Qt::Variant.from_value(self))
     end
-    # emit got_video_url(Qt::Variant.from_value(self))
   end
 end
-=begin
-        @token = metaInfo[:token]
-        # @id = metaInfo[:video_id]
-	metaInfo[:fmt_url_map] = KDE::Url::fromPercentEncoding(Qt::ByteArray.new '5%7Chttp%3A%2F%2Fv18.lscache7.c.youtube.com%2Fvideoplayback%3Fip%3D0.0.0.0%26sparams%3Did%252Cexpire%252Cip%252Cipbits%252Citag%252Calgorithm%252Cburst%252Cfactor%252Coc%253AU0dXRVBLVl9FSkNNN19IRVpJ%26fexp%3D907114%252C901807%26algorithm%3Dthrottle-factor%26itag%3D35%26ipbits%3D0%26burst%3D40%26sver%3D3%26expire%3D1280008800%26key%3Dyt1%26signature%3D8FEDA1F8E55CE9B9619771F56DBA47177F050459.991F2D20457A443E757A43D92F4863AAC3C48F91%26factor%3D1.25%26id%3D06cdf7a1fed8e492%2C34%7Chttp%3A%2F%2Fv4.lscache7.c.youtube.com%2Fvideoplayback%3Fip%3D0.0.0.0%26sparams%3Did%252Cexpire%252Cip%252Cipbits%252Citag%252Calgorithm%252Cburst%252Cfactor%252Coc%253AU0dXRVBLVl9FSkNNN19IRVpJ%26fexp%3D907114%252C901807%26algorithm%3Dthrottle-factor%26itag%3D34%26ipbits%3D0%26burst%3D40%26sver%3D3%26expire%3D1280008800%26key%3Dyt1%26signature%3D4EBA92F9E489B3589C42BB4FA1DCEB8B4E4615F2.50028543378A878D91170C9A3171C2F4EEA1519A%26factor%3D1.25%26id%3D06cdf7a1fed8e492%2C5%7Chttp%3A%2F%2Fv22.lscache8.c.youtube.com%2Fvideoplayback%3Fip%3D0.0.0.0%26sparams%3Did%252Cexpire%252Cip%252Cipbits%252Citag%252Calgorithm%252Cburst%252Cfactor%252Coc%253AU0dXRVBLVl9FSkNNN19IRVpJ%26fexp%3D907114%252C901807%26algorithm%3Dthrottle-factor%26itag%3D5%26ipbits%3D0%26burst%3D40%26sver%3D3%26expire%3D1280008800%26key%3Dyt1%26signature%3DAF2144EECC826813DA2AB26501259D86C769F984.01AB10ECFF13ED78E15F42E41CA7247A89231322%26factor%3D1.25%26id%3D06cdf7a1fed8e492')
-        @fmtUrlMap = Hash[*metaInfo[:fmt_url_map].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match.gsub(/ip=0\.0\.0\.0/,'ip=91.0.0.0')] }.flatten]
-	@video_url = KDE::Url.new @fmtUrlMap.max[1]
-# 	@video_url.remove_query_item 'fexp'
-	@video_url.remove_query_item 'ip'
-	@video_url.add_query_item 'ip', '91.0.0.0'
-	@video_url.remove_query_item 'ipbits'
-	@video_url.add_query_item 'ipbits', '8'
-# 	'%2Coc%3' bis &
-# 	@video_url = KDE::Url.new 'http://v18.lscache7.c.youtube.com/videoplayback?sparams=id%2Cexpire%2Cip%2Cipbits%2Citag%2Calgorithm%2Cburst%2Cfactor&fexp=907114&algorithm=throttle-factor&itag=35&burst=40&sver=3&expire=1280008800&key=yt1&signature=8FEDA1F8E55CE9B9619771F56DBA47177F050459.991F2D20457A443E757A43D92F4863AAC3C48F91&factor=1.25&id=06cdf7a1fed8e492&ip=91.0.0.0&ipbits=8'
-# 	@video_url = KDE::Url.new 'http://v18.lscache7.c.youtube.com/videoplayback?sparams=id%2Cexpire%2Cip%2Cipbits%2Citag%2Calgorithm%2Cburst%2Cfactor&fexp=907112&algorithm=throttle-factor&itag=35&burst=40&sver=3&expire=1280005200&key=yt1&signature=C10CB759157E664AC23DAA8BC834E9FE52C71490.86D4011BD99A183664350D2E5756965E12ABD419&factor=1.25&id=06cdf7a1fed8e492&ip=91.0.0.0&ipbits=8'
-	pp  @video_url.url
-	emit got_video_url(Qt::Variant.from_value(self))
-	videoRequestJob = KIO::mimetype KDE::Url.new @fmtUrlMap.max[1]
-        # videoRequestJob.addMetaData 'PropagateHttpHeader', 'true'
-        connect(videoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
-	  # aJob.queryMetaData 'HTTP-Headers'
-          if /^video\//.match(aJob.mimetype)
-	    @video_url = aJob.url
-	    emit got_video_url @video_url
-	  end
-        end
-=end
 
 Video.register_provider YoutubeVideo
 
@@ -778,14 +753,14 @@ if $0 == __FILE__
 
   KDE::CmdLineArgs.init(ARGV, about)
 
-#   unless KDE::UniqueApplication.start
-#     STDERR.puts "is already running."
-#   else
-#     a = KDE::UniqueApplication.new
-#     w = Kube::MainWindow.new
-#     a.exec
-#   end
- a = KDE::Application.new
- w = Kube::MainWindow.new
+  unless KDE::UniqueApplication.start
+    STDERR.puts "is already running."
+  else
+    a = KDE::UniqueApplication.new
+    w = Kube::MainWindow.new
+    a.exec
+  end
+#  a = KDE::Application.new
+#  w = Kube::MainWindow.new
  a.exec
 end
