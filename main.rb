@@ -154,9 +154,6 @@ class YoutubeVideo < Video
   @@validUrl = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
   INFO_REQUEST  = 'http://www.youtube.com/get_video_info?&video_id=%s&el=embedded&ps=default&eurl=&gl=US&hl=en'
   VIDEO_URL     = 'http://www.youtube.com/watch'
-  HEADER        = {
-    'cookies' => 'none'
-  }
 
   #:call-seq:
   #  accept?(KDE::Url) => bool
@@ -166,6 +163,24 @@ class YoutubeVideo < Video
 
   def self.get_type kurl
     self.new kurl if self.accept? kurl
+  end
+
+  def self.query videoList, query, start
+    puts __LINE__ if $DEBUG
+    max_results = 10
+    queryUrl = KDE::Url.new "http://gdata.youtube.com/feeds/api/videos?q=#{KDE::Url.to_percent_encoding query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
+    queryJob = KIO::storedGet queryUrl , KIO::NoReload, KIO::HideProgressInfo
+    connect(queryJob, SIGNAL( 'result( KJob* )' ), videoList) do |aJob|
+      JSON.parse( aJob.data.data )["feed"]["entry"].each do |entry|
+        if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
+          video.title = entry["title"]["$t"]
+          video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
+          video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
+          video.author = entry["author"][0]["name"]["$t"]
+          videoList.push video
+        end
+      end
+    end
   end
 
 #   def get_video_info qvariant = nil
@@ -185,9 +200,6 @@ class YoutubeVideo < Video
       @video_url = false
 
       infoRequestJob = KIO::storedGet @url , KIO::NoReload, KIO::HideProgressInfo
-      HEADER.each do |key, val|
-        infoRequestJob.addMetaData key, val
-      end
       infoRequestJob.add_meta_data 'cookies', 'none'
       connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
         match = /^\s*var swfConfig = (.+);$/.match aJob.data.data
@@ -212,14 +224,15 @@ class VideoList < Qt::AbstractListModel
 
   attr_reader :videos
 
-  def initialize videos = nil
+  def initialize providerClass
     super()
     @videos = []
-    @videos = videos unless videos.nil?
+    @provider = providerClass
     @activeVideo = nil
     @activeRow = nil
     @searching = false
     @autostart = false
+    @query = nil
   end
 
   def searching?
@@ -266,9 +279,15 @@ class VideoList < Qt::AbstractListModel
       @videos.delete_at row
     end
     end_remove_rows
-    reurn true
+    return true
   end
   alias :removeRows :remove_rows
+
+  def clear
+    begin_remove_rows Qt::ModelIndex.new, 0, @videos.size - 1
+    @videos.clear
+    end_remove_rows
+  end
 
   def include? row
     (0...@videos.size).include? row
@@ -337,6 +356,13 @@ class VideoList < Qt::AbstractListModel
   #:call-seq: => Qt::ModelIndex
   def index_for_video video
     create_index @videos.index(video), 0
+  end
+
+  def query query, start
+    puts __LINE__ if $DEBUG
+    self.clear if start == 0
+    puts __LINE__ if $DEBUG
+    @provider.query self, query, start
   end
 
 end
@@ -673,7 +699,7 @@ class MainWindow < KDE::MainWindow
     @listWidget.minimum_size = Qt::Size.new(320, 240)
     @listWidget.uniform_item_sizes = true
 
-    @videoList =  VideoList.new
+    @videoList =  VideoList.new YoutubeVideo
     @listWidget.model = @videoList
     connect(@listWidget, SIGNAL('activated(QModelIndex)')) do |modelIndex|
       if @videoList.include? modelIndex.row
@@ -700,7 +726,7 @@ class MainWindow < KDE::MainWindow
     @searchWidget = KDE::LineEdit.new self
     @searchWidget.clear_button_shown = true
     @searchWidget.connect( SIGNAL :returnPressed ) do
-      query @searchWidget.text, 0
+      @videoList.query @searchWidget.text, 0
       @searchWidget.clear
     end
     controlBar.add_widget @searchWidget
@@ -711,23 +737,6 @@ class MainWindow < KDE::MainWindow
 
     @searchWidget.focus = Qt::OtherFocusReason
     self.show
-  end
-
-  def query query, start
-    max_results = 25
-    uri = URI.parse "http://gdata.youtube.com/feeds/api/videos?q=#{CGI.escape query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
-    response, body = Net::HTTP.start(uri.host, uri.port) do |http|
-      http.get(uri.path+'?'+uri.query)
-    end
-    JSON.parse( body )["feed"]["entry"].each do |entry|
-      if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
-        video.title = entry["title"]["$t"]
-        video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
-        video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
-        video.author = entry["author"][0]["name"]["$t"]
-        @videoList.push video
-      end
-    end
   end
 
 end
@@ -753,14 +762,14 @@ if $0 == __FILE__
 
   KDE::CmdLineArgs.init(ARGV, about)
 
-  unless KDE::UniqueApplication.start
-    STDERR.puts "is already running."
-  else
-    a = KDE::UniqueApplication.new
-    w = Kube::MainWindow.new
-    a.exec
-  end
-#  a = KDE::Application.new
-#  w = Kube::MainWindow.new
+#   unless KDE::UniqueApplication.start
+#     STDERR.puts "is already running."
+#   else
+#     a = KDE::UniqueApplication.new
+#     w = Kube::MainWindow.new
+#     a.exec
+#   end
+  a = KDE::Application.new
+  w = Kube::MainWindow.new
  a.exec
 end
