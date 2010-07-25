@@ -632,9 +632,11 @@ class MainWindow < KDE::MainWindow
 
   def ini_phonon collection, menu, controlBar
     @videoPlayer = Phonon::VideoPlayer.new Phonon::VideoCategory, self
-    volumeSlider = Phonon::VolumeSlider.new @videoPlayer.audioOutput, self
-    seekSlider = Phonon::SeekSlider.new @videoPlayer.mediaObject, self
-    @seekSlider = seekSlider
+    @videoPlayer.media_object.tick_interval = 100
+    @volumeSlider = Phonon::VolumeSlider.new @videoPlayer.audioOutput, self
+    @volumeSlider.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
+    @seekSlider = Phonon::SeekSlider.new @videoPlayer.mediaObject, self
+    @seekSlider.set_size_policy(Qt::SizePolicy::Expanding, Qt::SizePolicy::Expanding)
 
     # action play pause
     @playPauseAction = collection.add_action 'switch-pause', KDE::Action.new( self )
@@ -688,17 +690,17 @@ class MainWindow < KDE::MainWindow
       action.set_icon KDE::Icon.new muted ? 'player-volume-muted' : 'player-volume' # audio-volume-muted' : 'audio-volume-medium'
       @videoPlayer.audioOutput.muted = muted
     end
-    connect(volumeSlider.audioOutput, SIGNAL('mutedChanged(bool)'), action, SLOT('setChecked(bool)') )
+    connect(@volumeSlider.audioOutput, SIGNAL('mutedChanged(bool)'), action, SLOT('setChecked(bool)') )
     audioMenu.add_action action
 
     menu.add_separator
 
     action = collection.add_action 'volume-slider', KDE::Action.new( i18n( 'Volume Slider' ), self )
-    action.default_widget = volumeSlider
+    action.default_widget = @volumeSlider
     controlBar.add_action action
 
     action = collection.add_action 'seek-slider', KDE::Action.new( i18n( 'Position Slider' ), self )
-    action.default_widget = seekSlider
+    action.default_widget = @seekSlider
     controlBar.add_action action
 
   end
@@ -755,6 +757,8 @@ class MainWindow < KDE::MainWindow
 
     # add search field
     @searchWidget = KDE::LineEdit.new self
+    @searchWidget.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
+    @searchWidget.set_minimum_size(150,0)
     controlBar.add_widget @searchWidget
 
     @listWidget = ListView.new dock, YoutubeVideo, @videoPlayer, @searchWidget
