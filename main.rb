@@ -165,9 +165,9 @@ class YoutubeVideo < Video
     self.new kurl if self.accept? kurl
   end
 
-  def self.query videoList, query, start
-    puts __LINE__ if $DEBUG
-    max_results = 10
+  def self.query videoList, query, start, minimum_size
+    max_results = [6, minimum_size].max
+    videoList.queryVeto = max_results
     queryUrl = KDE::Url.new "http://gdata.youtube.com/feeds/api/videos?q=#{KDE::Url.to_percent_encoding query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
     queryJob = KIO::storedGet queryUrl , KIO::NoReload, KIO::HideProgressInfo
     connect(queryJob, SIGNAL( 'result( KJob* )' ), videoList) do |aJob|
@@ -178,6 +178,7 @@ class YoutubeVideo < Video
           video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
           video.author = entry["author"][0]["name"]["$t"]
           videoList.push video
+          videoList.queryVeto -= 1
         end
       end
     end
@@ -223,20 +224,18 @@ class VideoList < Qt::AbstractListModel
   signals 'play_this(QVariant)'
 
   attr_reader :videos
+  attr_accessor :queryVeto
 
-  def initialize providerClass
+  def initialize providerClass, minimumSize = 0
     super()
     @videos = []
     @provider = providerClass
+    @minimumSize = minimumSize
     @activeVideo = nil
     @activeRow = nil
-    @searching = false
     @autostart = false
     @query = nil
-  end
-
-  def searching?
-    @searching
+    @queryVeto = 0 # allow new query when @queryVeto == 0
   end
 
   # inherited from Qt::AbstractListModel
@@ -353,9 +352,21 @@ class VideoList < Qt::AbstractListModel
   end
 
   def query query = nil
-    self.clear unless query == @query
-    @query = query unless query.nil?
-    @provider.query self, @query, @videos.size unless @query.nil?
+    if not (query.nil? or query.empty?) and query != @query
+      self.clear
+      @queryVeto = 0
+      @query = query
+    end
+    if not @query.nil? and @queryVeto == 0
+      @provider.query self, @query, self.videos.size, @minimumSize
+    end
+  end
+
+  def minimum_size= size
+    @minimumSize = size
+    if @minimumSize > @videos.size
+      self.query
+    end
   end
 
 end
@@ -441,7 +452,7 @@ class VideoItemDelegate < Qt::StyledItemDelegate
       else
         format = 'm:ss'
       end
-      # draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
+      draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
     end
 
     painter.font = @boldFont if isActive
@@ -475,13 +486,13 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_text authorTextBox, alignHints, author
     painter.restore
 
+=end
     painter.pen = styleOptionViewItem.palette.color(Qt::Palette::Midlight)
     painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
     painter.pen = Qt::Color.new(Qt::black) unless video.thumbnail.nil?
     painter.draw_line 0, THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
-=end
+
     painter.restore
-    puts __LINE__ if $DEBUG
   end
 
   def paint_active_overlay painter, x, y, w, h
@@ -533,6 +544,67 @@ class VideoItemDelegate < Qt::StyledItemDelegate
     painter.draw_pixmap @playIcon.rect, @playIcon
     painter.restore
   end
+end
+
+class ListView < Qt::ListView
+
+  attr_accessor :videoList
+
+  def initialize parent, providerClass, videoPlayer, searchWidget
+    super(parent)
+    # self.view_mode = Qt::ListView::ListMode
+    self.item_delegate = VideoItemDelegate.new(self)
+    # self.selection_mode = Qt::AbstractItemView::ExtendedSelection
+    self.vertical_scroll_mode = Qt::AbstractItemView::ScrollPerPixel
+    self.frame_shape = Qt::Frame::NoFrame
+    # self.attribute = Qt::WA_MacShowFocusRect, false FIXME
+    self.minimum_size = Qt::Size.new 320, 240
+    self.uniform_item_sizes = true
+
+    @provider = providerClass
+    @videoPlayer = videoPlayer
+    @searchWidget = searchWidget
+
+    puts @provider
+    @videoList =  VideoList.new @provider
+    self.model = @videoList
+
+    connect(self, SIGNAL('activated(QModelIndex)')) do |modelIndex|
+      @videoList.active = modelIndex.row
+    end
+
+    self.vertical_scroll_bar.tracking = true
+    connect(self.vertical_scroll_bar, SIGNAL('valueChanged(int)')) do |pos|
+      if self.vertical_scroll_bar.maximum == pos
+        @videoList.query
+      end
+    end
+
+    connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
+      video = @videoList[row]
+      @active_video = video
+      video.request_video_url
+    end
+
+    connect(@videoList, SIGNAL('play_this(QVariant)')) do |variant|
+      video = variant.value
+      if @active_video == video
+        @videoPlayer.play Phonon::MediaSource.new video.video_url
+      end
+    end
+
+    @searchWidget.clear_button_shown = true
+    @searchWidget.connect( SIGNAL :returnPressed ) do
+      @videoList.query @searchWidget.text
+      @searchWidget.clear
+    end
+  end
+
+  def resize_event event
+    @videoList.minimum_size = event.size.height/VideoItemDelegate::THUMBNAIL_SIZE[1] + 1
+  end
+  alias :resizeEvent :resize_event
+
 end
 
 class MainWindow < KDE::MainWindow
@@ -681,61 +753,13 @@ class MainWindow < KDE::MainWindow
     dock.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
     self.add_dock_widget Qt::LeftDockWidgetArea, dock
 
-    @listWidget = Qt::ListView.new dock
-    dock.widget = @listWidget
-#     @listWidget.view_mode = Qt::ListView::ListMode
-    @listWidget.item_delegate = VideoItemDelegate.new(self)
-    # @listWidget.selection_mode = Qt::AbstractItemView::ExtendedSelection
-    @listWidget.vertical_scroll_mode = Qt::AbstractItemView::ScrollPerPixel
-    @listWidget.frame_shape = Qt::Frame::NoFrame
-    # @listWidget.attribute = Qt::WA_MacShowFocusRect, false FIXME
-    @listWidget.minimum_size = Qt::Size.new(320, 240)
-    @listWidget.uniform_item_sizes = true
-
-    @videoList =  VideoList.new YoutubeVideo
-    @listWidget.model = @videoList
-    connect(@listWidget, SIGNAL('activated(QModelIndex)')) do |modelIndex|
-      if @videoList.include? modelIndex.row
-        @videoList.active = modelIndex.row
-      else
-        # TODO search button
-      end
-    end
-
-    @listWidget.vertical_scroll_bar.tracking = true
-    connect(@listWidget.vertical_scroll_bar, SIGNAL('valueChanged(int)')) do |pos|
-      if @listWidget.vertical_scroll_bar.maximum == pos
-        @videoList.query
-      end
-    end
-
-    connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
-      video = @videoList[row]
-      @active_video = video
-      video.request_video_url
-    end
-
-    connect(@videoList, SIGNAL('play_this(QVariant)')) do |variant|
-      video = variant.value
-      if @active_video == video
-	@videoPlayer.play Phonon::MediaSource.new video.video_url
-      end
-    end
-
     # add search field
     @searchWidget = KDE::LineEdit.new self
-    @searchWidget.clear_button_shown = true
-    @searchWidget.connect( SIGNAL :returnPressed ) do
-      @videoList.query @searchWidget.text
-      @searchWidget.clear
-    end
     controlBar.add_widget @searchWidget
 
-    # video_url = 'http://www.youtube.com/get_video?video_id=BU9w9ZtiO8I&t=vjVQa1PpcFPXqhCZqn_V_fcSdspsKvB16IM6uoGvNug=&eurl=&el=embedded&ps=default&fmt=18'
-#     video_url = '/home/rriemann/Documents/Videos/Player/Austin_Powers_Goldstaender_08.08.15_20-15_rtl2_115_TVOON_DE.mpg.mp4-cut.avi'
-    # @videoPlayer.play Phonon::MediaSource.new video_url
+    @listWidget = ListView.new dock, YoutubeVideo, @videoPlayer, @searchWidget
+    dock.widget = @listWidget
 
-    @searchWidget.focus = Qt::OtherFocusReason
     self.show
   end
 
