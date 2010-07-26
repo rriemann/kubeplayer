@@ -213,6 +213,23 @@ class YoutubeVideo < Video
       emit got_video_url(Qt::Variant.from_value(self))
     end
   end
+
+  class QueryCompletition < KDE::Completion
+    URL = 'http://suggestqueries.google.com/complete/search?json=t&hl=en&q=%s&nolabels=t'
+    def initialize
+      super()
+      self.completion_mode = KDE::GlobalSettings::CompletionPopupAuto
+    end
+
+    def make_completion text
+      puts text
+      r = text + 'RRR'
+      emit match(r)
+      r
+    end
+    alias :makeCompletion :make_completion
+
+  end
 end
 
 Video.register_provider YoutubeVideo
@@ -565,7 +582,6 @@ class ListView < Qt::ListView
     @videoPlayer = videoPlayer
     @searchWidget = searchWidget
 
-    puts @provider
     @videoList =  VideoList.new @provider
     self.model = @videoList
 
@@ -597,6 +613,11 @@ class ListView < Qt::ListView
     @searchWidget.connect( SIGNAL :returnPressed ) do
       @videoList.query @searchWidget.text
       @searchWidget.clear
+    end
+    if @provider.constants.include? :QueryCompletition
+      @searchWidget.completion_object = @provider::QueryCompletition.new
+      @searchWidget.auto_delete_completion_object = true
+#       connect(@searchWidget,SIGNAL('userTextChanged(QString)'),@searchWidget,SIGNAL('completion(QString)'))
     end
   end
 
