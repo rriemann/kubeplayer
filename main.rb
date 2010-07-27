@@ -151,35 +151,37 @@ end
 
 class YoutubeVideo < Video
 
-  @@validUrl = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
-  INFO_REQUEST  = 'http://www.youtube.com/get_video_info?&video_id=%s&el=embedded&ps=default&eurl=&gl=US&hl=en'
-  VIDEO_URL     = 'http://www.youtube.com/watch'
-
+  VALID_URL = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
   #:call-seq:
   #  accept?(KDE::Url) => bool
   def self.accept? kurl
-    @@validUrl.exact_match kurl.url
+    VALID_URL.exact_match kurl.url
   end
 
   def self.get_type kurl
     self.new kurl if self.accept? kurl
   end
 
+  QUERY_URL = 'http://gdata.youtube.com/feeds/api/videos?q=%s&max-results=%d&start-index=%d&alt=json'
   def self.query videoList, query, start, minimum_size
     max_results = [6, minimum_size].max
     videoList.queryVeto = max_results
-    queryUrl = KDE::Url.new "http://gdata.youtube.com/feeds/api/videos?q=#{KDE::Url.to_percent_encoding query}&max-results=#{max_results}&start-index=#{start+1}&alt=json" # TODO
+    queryUrl = KDE::Url.new(QUERY_URL % [(KDE::Url.to_percent_encoding query), max_results, start+1])
     queryJob = KIO::storedGet queryUrl , KIO::NoReload, KIO::HideProgressInfo
     connect(queryJob, SIGNAL( 'result( KJob* )' ), videoList) do |aJob|
-      JSON.parse( aJob.data.data )["feed"]["entry"].each do |entry|
-        if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
-          video.title = entry["title"]["$t"]
-          video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
-          video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
-          video.author = entry["author"][0]["name"]["$t"]
-          videoList.push video
-          videoList.queryVeto -= 1
+      begin
+        JSON.parse( aJob.data.data )["feed"]["entry"].each do |entry|
+          if (video = YoutubeVideo.get( KDE::Url.new(entry["link"][0]["href"]) ))
+            video.title = entry["title"]["$t"]
+            video.thumbnail_url = KDE::Url.new(entry["media$group"]["media$thumbnail"][-1]["url"])
+            video.duration = entry["media$group"]["yt$duration"]["seconds"].to_f
+            video.author = entry["author"][0]["name"]["$t"]
+            videoList.push video
+            videoList.queryVeto -= 1
+          end
         end
+      rescue NoMethodError
+        puts 'No Videos found'
       end
     end
   end
@@ -204,6 +206,7 @@ class YoutubeVideo < Video
   end
 
 
+  REQUEST_URL  = 'http://www.youtube.com/get_video_info?&video_id=%s&el=embedded&ps=default&eurl=&gl=US&hl=en'
   # http://eduviews.com/portal/getting-youtube-video-url
   def request_video_url
     if @video_url == nil
