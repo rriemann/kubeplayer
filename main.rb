@@ -15,7 +15,7 @@ require 'pp'
 #
 # The VideoProvider class is expected to reimplement #accept? and others
 #
-module Kube
+module KubePlayer
 
   UserRole = Qt::UserRole.to_i
   ItemTypeRole, VideoRole, ActiveTrackRole = *(UserRole...(UserRole+3))
@@ -181,7 +181,7 @@ class YoutubeVideo < Video
           end
         end
       rescue NoMethodError
-        puts 'No Videos found'
+        qDebug 'No Videos found'
       end
     end
   end
@@ -194,12 +194,6 @@ class YoutubeVideo < Video
       searchWidget.completed_items = JSON.parse(aJob.data.data)[1]
     end
   end
-
-#   def get_video_info qvariant = nil
-#     video_url
-#
-#     emit got_video_info
-#   end
 
   def initialize kurl
     super(kurl)
@@ -222,14 +216,6 @@ class YoutubeVideo < Video
         end
         @fmtUrlMap = {}
         metaInfo[:fmt_url_map].scan(/(\d+)\|([^,]+)/).each {|quality,url| @fmtUrlMap[quality.to_i] = url}
-
-=begin # Use Wep-Page scrapping
-      infoRequestJob = KIO::storedGet @url , KIO::NoReload, KIO::HideProgressInfo
-      infoRequestJob.add_meta_data 'cookies', 'none'
-      connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
-        match = /^\s*var swfConfig = (.+);$/.match aJob.data.data
-        @fmtUrlMap = Hash[*JSON.parse(match[1])['args']['fmt_url_map'].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match.gsub(/ip=0\.0\.0\.0/,'ip=91.0.0.0')] }.flatten]
-=end
         @video_url = KDE::Url.new @fmtUrlMap.max[1]
         emit got_video_url(Qt::Variant.from_value(self))
       end
@@ -264,7 +250,6 @@ class VideoList < Qt::AbstractListModel
 
   # inherited from Qt::AbstractListModel
   def data modelIndex, role
-    puts __LINE__ if $DEBUG
     row = modelIndex.row
     if include? row
       video = @videos[row]
@@ -272,14 +257,11 @@ class VideoList < Qt::AbstractListModel
       when VideoRole then
         return Qt::Variant.from_value video
       when ActiveTrackRole then
-        puts __LINE__ if $DEBUG
         return Qt::Variant.new(video == @activeVideo)
       when Qt::DisplayRole, Qt::StatusTipRole then
-          puts __LINE__ if $DEBUG
           return Qt::Variant.new video.to_s
       end
     end
-    puts __LINE__.to_s + " " + role.inspect if $DEBUG
     Qt::Variant.new
   end
 
@@ -393,181 +375,6 @@ class VideoList < Qt::AbstractListModel
     end
   end
 
-end
-
-class VideoItemDelegate < Qt::StyledItemDelegate
-  THUMBNAIL_SIZE = [120, 90]
-  PADDING = 10
-
-  def initialize parent
-
-    super
-
-    @boldFont = Qt::Font.new
-    @boldFont.bold = true
-
-    @smallerFont = Qt::Font.new
-    @smallerFont.point_size = @smallerFont.point_size*0.85
-
-    @smallerBoldFont = Qt::Font.new
-    @smallerBoldFont.bold = true
-    @smallerBoldFont.point_size = @smallerBoldFont.point_size*0.85
-
-    fontInfo = Qt::FontInfo.new @smallerFont
-    if fontInfo.pixel_size < 10
-      @smallerFont.pixel_size = 10
-      @smallerBoldFont.pixel_size = 10
-    end
-
-    @playIcon = Qt::Pixmap.new *THUMBNAIL_SIZE
-    @playIcon.fill Qt::Color.new(Qt::transparent)
-    painter = Qt::Painter.new @playIcon
-    polygon = Qt::Polygon.new [Qt::Point.new(PADDING*4, PADDING*4), Qt::Point.new(THUMBNAIL_SIZE[0]-PADDING*4, THUMBNAIL_SIZE[1]/2), Qt::Point.new(PADDING*4, THUMBNAIL_SIZE[1]-PADDING*2)]
-    # painter.render_hint = Qt::Painter::Antialiasing FIXME
-    painter.brush = Qt::white
-    pen = Qt::Pen.new
-    pen.color = Qt::Color.new Qt::white
-    pen.width = PADDING
-    pen.join_style = Qt::RoundJoin
-    pen.cap_style = Qt::RoundCap
-    painter.pen = pen
-    painter.draw_polygon polygon
-  end
-
-  def size_hint styleOptionViewItem, modelIndex
-    Qt::Size.new 256, THUMBNAIL_SIZE[1]+1
-  end
-  alias :sizeHint :size_hint
-
-  def paint painter, styleOptionViewItem, modelIndex
-    puts __LINE__ if $DEBUG
-    KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
-    video = modelIndex.data(VideoRole).value
-    paint_body painter, styleOptionViewItem, modelIndex
-  end
-
-  def paint_body painter, styleOptionViewItem, modelIndex
-    painter.save
-    painter.translate styleOptionViewItem.rect.top_left
-
-    line = Qt::RectF.new 0, 0, styleOptionViewItem.rect.width, styleOptionViewItem.rect.height
-    painter.clip_rect = line
-
-
-    isActive = modelIndex.data(ActiveTrackRole).to_bool
-    # isSelected = !((Qt::Style::State_Selected.to_i & styleOptionViewItem.state) > 0)
-
-    # puts Qt::Style::State_Selected.inspect + ' ' + styleOptionViewItem.state.inspect
-    # puts isActive.inspect + ' ' + isSelected.inspect
-    if isActive
-      paint_active_overlay painter, line.x, line.y, line.width, line.height
-    end
-    video = modelIndex.data(VideoRole).value
-    #puts isSelected.inspect + " " + video.title
-
-    unless video.thumbnail.nil?
-      puts __LINE__ if $DEBUG
-      painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
-      puts __LINE__ if $DEBUG
-      # paint_play_icon painter if isActive FIXME
-
-      if video.duration > 3600 # more than 1 h
-        format = 'h:mm:ss'
-      else
-        format = 'm:ss'
-      end
-      draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
-    end
-
-    painter.font = @boldFont if isActive
-    fm = Qt::FontMetricsF.new painter.font
-    boldMetrics = Qt::FontMetricsF.new @boldFont
-
-    painter.pen = Qt::Pen.new(styleOptionViewItem.palette.brush(false ? Qt::Palette::HighlightedText : Qt::Palette::Text),0)
-
-    title = video.title
-    textBox = Qt::RectF.new line.adjusted PADDING+THUMBNAIL_SIZE[0], PADDING, -2*PADDING, -PADDING
-    alignHints = (Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap)
-    textBox = painter.boundingRect textBox, alignHints, title
-    painter.draw_text textBox, alignHints, title
-
-=begin
-    painter.font = @smallerFont
-    published = video.published.date.to_string Qt::DefaultLocaleShortDate
-    publishedSize = Qt::SizeF.new(Qt::FontMetrics.new(painter.font).size(Qt::TextSingleLine, published))
-    textLocation = Qt::PointF.new PADDING+THUMBNAIL_SIZE[0], PADDING*2+textBox.height
-    publishedTextBox = Qt::RectF.new textLocation, publishedSize
-    painter.draw_text publishedTextBox, alignHints, published
-
-    painter.save
-    painter.font = @smallerBoldFont
-
-    painter.pen(Qt::Pen.new(styleOptionViewItem.palette.brush(Qt::Palette::Mid), 0)) if not isSelected and not isActive
-    author = video.author
-    authorSize = Qt::SizeF.new(Qt::FontMetrics.new(painter.font).size(Qt::TextSingleLine, author))
-    textLocation.x = textLocation.x + publishedSize.width + PADDING
-    authorTextBox = Qt::RectF.new textLocation, authorSize
-    painter.draw_text authorTextBox, alignHints, author
-    painter.restore
-
-=end
-    painter.pen = styleOptionViewItem.palette.color(Qt::Palette::Midlight)
-    painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
-    painter.pen = Qt::Color.new(Qt::black) unless video.thumbnail.nil?
-    painter.draw_line 0, THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
-
-    painter.restore
-  end
-
-  def paint_active_overlay painter, x, y, w, h
-    palette = Qt::Palette.new
-    highlightColor = palette.color Qt::Palette::Highlight
-    backgroundColor = palette.color Qt::Palette::Base
-
-    animation = 0.25
-    gradientRange = 16
-
-    color2 = Qt::Color.fromHsv(highlightColor.hue,
-                               (backgroundColor.saturation*(1-animation)+highlightColor.saturation*animation).to_i,
-                               (backgroundColor.value*(1-animation)+highlightColor.value*animation).to_i)
-    color1 = Qt::Color.fromHsv(color2.hue,[color2.saturation-gradientRange,0].max,[color2.value+gradientRange,255].min)
-    rect = Qt::Rect.new x.to_i, y.to_i, w.to_i, h.to_i
-    painter.save
-    painter.pen = Qt::Pen.new(Qt::NoPen)
-    linearGradient = Qt::LinearGradient.new 0, 0, 0, rect.height
-    linearGradient.setColorAt(0, color1) # FIXME why not color_at= ?
-    linearGradient.setColorAt(1, color2)
-    painter.brush = Qt::Brush.new(linearGradient)
-    painter.draw_rect rect
-    painter.restore
-  end
-
-
-  def draw_time painter, time, line
-    timePadding = 4
-    textBox = painter.bounding_rect line, Qt::AlignLeft | Qt::AlignTop, time
-    textBox.adjust 0, 0, timePadding, 0
-    textBox.translate THUMBNAIL_SIZE[0]-textBox.width, THUMBNAIL_SIZE[1]-textBox.height
-
-    painter.save
-    painter.pen = Qt::Pen.new(Qt::NoPen)
-    painter.brush = Qt::Brush.new(Qt::black)
-    painter.opacity = 0.5
-    painter.draw_rect textBox
-    painter.restore
-
-    painter.save
-    painter.pen = Qt::Color.new(Qt::white)
-    painter.draw_text textBox, Qt::AlignCenter, time
-    painter.restore
-  end
-
-  def paint_play_icon painter
-    painter.save
-    painter.opacity = 0.5
-    painter.draw_pixmap @playIcon.rect, @playIcon
-    painter.restore
-  end
 end
 
 class ListView < Qt::ListView
@@ -812,23 +619,192 @@ class MainWindow < KDE::MainWindow
 
 end
 
+
+class VideoItemDelegate < Qt::StyledItemDelegate
+  THUMBNAIL_SIZE = [120, 90]
+  PADDING = 10
+
+  def initialize parent
+
+    super
+
+    @boldFont = Qt::Font.new
+    @boldFont.bold = true
+
+    @smallerFont = Qt::Font.new
+    @smallerFont.point_size = @smallerFont.point_size*0.85
+
+    @smallerBoldFont = Qt::Font.new
+    @smallerBoldFont.bold = true
+    @smallerBoldFont.point_size = @smallerBoldFont.point_size*0.85
+
+    fontInfo = Qt::FontInfo.new @smallerFont
+    if fontInfo.pixel_size < 10
+      @smallerFont.pixel_size = 10
+      @smallerBoldFont.pixel_size = 10
+    end
+
+    @playIcon = Qt::Pixmap.new *THUMBNAIL_SIZE
+    @playIcon.fill Qt::Color.new(Qt::transparent)
+    painter = Qt::Painter.new @playIcon
+    polygon = Qt::Polygon.new [Qt::Point.new(PADDING*4, PADDING*4), Qt::Point.new(THUMBNAIL_SIZE[0]-PADDING*4, THUMBNAIL_SIZE[1]/2), Qt::Point.new(PADDING*4, THUMBNAIL_SIZE[1]-PADDING*2)]
+    # painter.render_hint = Qt::Painter::Antialiasing FIXME
+    painter.brush = Qt::white
+    pen = Qt::Pen.new
+    pen.color = Qt::Color.new Qt::white
+    pen.width = PADDING
+    pen.join_style = Qt::RoundJoin
+    pen.cap_style = Qt::RoundCap
+    painter.pen = pen
+    painter.draw_polygon polygon
+  end
+
+  def size_hint styleOptionViewItem, modelIndex
+    Qt::Size.new 256, THUMBNAIL_SIZE[1]+1
+  end
+  alias :sizeHint :size_hint
+
+  def paint painter, styleOptionViewItem, modelIndex
+    KDE::Application.style.drawPrimitive Qt::Style::PE_PanelItemViewItem, styleOptionViewItem, painter
+    video = modelIndex.data(VideoRole).value
+    paint_body painter, styleOptionViewItem, modelIndex
+  end
+
+  def paint_body painter, styleOptionViewItem, modelIndex
+    painter.save
+    painter.translate styleOptionViewItem.rect.top_left
+
+    line = Qt::RectF.new 0, 0, styleOptionViewItem.rect.width, styleOptionViewItem.rect.height
+    painter.clip_rect = line
+
+
+    isActive = modelIndex.data(ActiveTrackRole).to_bool
+    # isSelected = !((Qt::Style::State_Selected.to_i & styleOptionViewItem.state) > 0)
+
+    # puts Qt::Style::State_Selected.inspect + ' ' + styleOptionViewItem.state.inspect
+    # puts isActive.inspect + ' ' + isSelected.inspect
+    if isActive
+      paint_active_overlay painter, line.x, line.y, line.width, line.height
+    end
+    video = modelIndex.data(VideoRole).value
+    #puts isSelected.inspect + " " + video.title
+
+    unless video.thumbnail.nil?
+      painter.draw_image(Qt::Rect.new(0, 0, *THUMBNAIL_SIZE), video.thumbnail)
+      # paint_play_icon painter if isActive FIXME
+
+      if video.duration > 3600 # more than 1 h
+        format = 'h:mm:ss'
+      else
+        format = 'm:ss'
+      end
+      draw_time painter, Qt::Time.new.add_secs(video.duration).to_string(format), line
+    end
+
+    painter.font = @boldFont if isActive
+    fm = Qt::FontMetricsF.new painter.font
+    boldMetrics = Qt::FontMetricsF.new @boldFont
+
+    painter.pen = Qt::Pen.new(styleOptionViewItem.palette.brush(false ? Qt::Palette::HighlightedText : Qt::Palette::Text),0)
+
+    title = video.title
+    textBox = Qt::RectF.new line.adjusted PADDING+THUMBNAIL_SIZE[0], PADDING, -2*PADDING, -PADDING
+    alignHints = (Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap)
+    textBox = painter.boundingRect textBox, alignHints, title
+    painter.draw_text textBox, alignHints, title
+
+=begin
+    painter.font = @smallerFont
+    published = video.published.date.to_string Qt::DefaultLocaleShortDate
+    publishedSize = Qt::SizeF.new(Qt::FontMetrics.new(painter.font).size(Qt::TextSingleLine, published))
+    textLocation = Qt::PointF.new PADDING+THUMBNAIL_SIZE[0], PADDING*2+textBox.height
+    publishedTextBox = Qt::RectF.new textLocation, publishedSize
+    painter.draw_text publishedTextBox, alignHints, published
+
+    painter.save
+    painter.font = @smallerBoldFont
+
+    painter.pen(Qt::Pen.new(styleOptionViewItem.palette.brush(Qt::Palette::Mid), 0)) if not isSelected and not isActive
+    author = video.author
+    authorSize = Qt::SizeF.new(Qt::FontMetrics.new(painter.font).size(Qt::TextSingleLine, author))
+    textLocation.x = textLocation.x + publishedSize.width + PADDING
+    authorTextBox = Qt::RectF.new textLocation, authorSize
+    painter.draw_text authorTextBox, alignHints, author
+    painter.restore
+
+=end
+    painter.pen = styleOptionViewItem.palette.color(Qt::Palette::Midlight)
+    painter.draw_line THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1], line.width, THUMBNAIL_SIZE[1]
+    painter.pen = Qt::Color.new(Qt::black) unless video.thumbnail.nil?
+    painter.draw_line 0, THUMBNAIL_SIZE[1], THUMBNAIL_SIZE[0]-1, THUMBNAIL_SIZE[1]
+
+    painter.restore
+  end
+
+  def paint_active_overlay painter, x, y, w, h
+    palette = Qt::Palette.new
+    highlightColor = palette.color Qt::Palette::Highlight
+    backgroundColor = palette.color Qt::Palette::Base
+
+    animation = 0.25
+    gradientRange = 16
+
+    color2 = Qt::Color.fromHsv(highlightColor.hue,
+                               (backgroundColor.saturation*(1-animation)+highlightColor.saturation*animation).to_i,
+                               (backgroundColor.value*(1-animation)+highlightColor.value*animation).to_i)
+    color1 = Qt::Color.fromHsv(color2.hue,[color2.saturation-gradientRange,0].max,[color2.value+gradientRange,255].min)
+    rect = Qt::Rect.new x.to_i, y.to_i, w.to_i, h.to_i
+    painter.save
+    painter.pen = Qt::Pen.new(Qt::NoPen)
+    linearGradient = Qt::LinearGradient.new 0, 0, 0, rect.height
+    linearGradient.setColorAt(0, color1) # FIXME why not color_at= ?
+    linearGradient.setColorAt(1, color2)
+    painter.brush = Qt::Brush.new(linearGradient)
+    painter.draw_rect rect
+    painter.restore
+  end
+
+
+  def draw_time painter, time, line
+    timePadding = 4
+    textBox = painter.bounding_rect line, Qt::AlignLeft | Qt::AlignTop, time
+    textBox.adjust 0, 0, timePadding, 0
+    textBox.translate THUMBNAIL_SIZE[0]-textBox.width, THUMBNAIL_SIZE[1]-textBox.height
+
+    painter.save
+    painter.pen = Qt::Pen.new(Qt::NoPen)
+    painter.brush = Qt::Brush.new(Qt::black)
+    painter.opacity = 0.5
+    painter.draw_rect textBox
+    painter.restore
+
+    painter.save
+    painter.pen = Qt::Color.new(Qt::white)
+    painter.draw_text textBox, Qt::AlignCenter, time
+    painter.restore
+  end
+
+  def paint_play_icon painter
+    painter.save
+    painter.opacity = 0.5
+    painter.draw_pixmap @playIcon.rect, @playIcon
+    painter.restore
+  end
+end
+
 end
 
 if $0 == __FILE__
-
   about = KDE::AboutData.new(
-    "kminitube",                           # internal application name
-    # language catlog name for i10n (konqueror's catalog for the beginning is better than no catalog)
-    "konqueror",
-    KDE.ki18n("KMiniTube"),                 # application name in the about menu and everywhere else
-    "0.1",                             # application version
-    KDE::ki18n("A Tool to easily create HTML formatted Code"),  # short description
-    KDE::AboutData::License_GPL_V3,    # license
-    KDE::ki18n("(c) 1999-2000, Name"), # copyright info
-    # text in the about box - maybe with \n line breaks
-    KDE::ki18n("just some text in the about box"),
-    # project homepage and eMail adress for bug reports - attention: homepage changes standard dbus/dcop name!
-    "http://homepage.de", "bugs@homepage.de" )
+    "kubeplayer",
+    "kubeplayer",
+    KDE.ki18n("Kube Player"),
+    "0.1",
+    KDE::ki18n("A video player dedicated to play online videos."),
+    KDE::AboutData::License_GPL_V3,
+    KDE::ki18n("(c) 2010, Robert Riemann"),
+    KDE::ki18n("Kube Player is a dedicated to play online videos without the need of flash.\nIf you find a bug, please report it to <a href=\"http://github.com/saLOUt/kubeplayer/issues\">http://github.com/saLOUt/kubeplayer/issues</a>."),
+    "http://github.com/saLOUt/kubeplayer", "saloution@googlemail.com" )
   about.setProgramIconName  "plasma" # use the plasma-icon instead of question mark
 
   KDE::CmdLineArgs.init(ARGV, about)
@@ -841,6 +817,6 @@ if $0 == __FILE__
 #     a.exec
 #   end
   a = KDE::Application.new
-  w = Kube::MainWindow.new
- a.exec
+  w = KubePlayer::MainWindow.new
+  a.exec
 end
