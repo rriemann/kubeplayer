@@ -205,20 +205,32 @@ class YoutubeVideo < Video
     super(kurl)
   end
 
-
   REQUEST_URL  = 'http://www.youtube.com/get_video_info?&video_id=%s&el=embedded&ps=default&eurl=&gl=US&hl=en'
-  # http://eduviews.com/portal/getting-youtube-video-url
   def request_video_url
     if @video_url == nil
       @video_url = false
+      @id = @url.url.match(/\bv=([^&]+)/)[1]
+      infoRequestUrl = KDE::Url.new (REQUEST_URL % @id)
+      # infoRequestUrl.add_query_item 'video_id', @id
+      infoRequestJob = KIO::storedGet infoRequestUrl , KIO::NoReload, KIO::HideProgressInfo
+      infoRequestJob.add_meta_data 'cookies', 'none'
+      connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
+        metaInfo = {}
+        aJob.data.data.split('&').each do |s|
+          match = /=/.match s
+          metaInfo[match.pre_match.to_sym] = KDE::Url::fromPercentEncoding(Qt::ByteArray.new match.post_match)
+        end
+        @fmtUrlMap = {}
+        metaInfo[:fmt_url_map].scan(/(\d+)\|([^,]+)/).each {|quality,url| @fmtUrlMap[quality.to_i] = url}
 
+=begin # Use Wep-Page scrapping
       infoRequestJob = KIO::storedGet @url , KIO::NoReload, KIO::HideProgressInfo
       infoRequestJob.add_meta_data 'cookies', 'none'
       connect(infoRequestJob, SIGNAL( 'result( KJob* )' )) do |aJob|
         match = /^\s*var swfConfig = (.+);$/.match aJob.data.data
         @fmtUrlMap = Hash[*JSON.parse(match[1])['args']['fmt_url_map'].split(',').map{ |val| val = /\|/.match(val); [val.pre_match.to_i, val.post_match.gsub(/ip=0\.0\.0\.0/,'ip=91.0.0.0')] }.flatten]
+=end
         @video_url = KDE::Url.new @fmtUrlMap.max[1]
-
         emit got_video_url(Qt::Variant.from_value(self))
       end
     elsif @video_url != false
