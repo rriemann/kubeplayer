@@ -620,7 +620,8 @@ class HistoryComboBox < KDE::ComboBox # < KDE::HistoryComboBox
     self.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
     self.set_minimum_size(200,0)
     self.duplicates_enabled = false
-    self.completion_mode = KDE::GlobalSettings::CompletionPopupAuto
+#     self.completion_mode = KDE::GlobalSettings::CompletionPopupAuto # TODO let configure
+    self.completion_mode = KDE::GlobalSettings::CompletionPopup
   end
 end
 
