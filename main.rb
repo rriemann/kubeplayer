@@ -168,7 +168,7 @@ class YoutubeVideo < Video
   def self.query videoList, query, start, minimum_size
     max_results = [6, minimum_size].max
     videoList.queryVeto = max_results
-    queryUrl = KDE::Url.new "http://gdata.youtube.com/feeds/api/videos?q=#{KDE::Url.to_percent_encoding query}&max-results=#{max_results}&start-index=#{start+1}&alt=json"
+    queryUrl = KDE::Url.new "http://gdata.youtube.com/feeds/api/videos?q=#{KDE::Url.to_percent_encoding query}&max-results=#{max_results}&start-index=#{start+1}&alt=json" # TODO
     queryJob = KIO::storedGet queryUrl , KIO::NoReload, KIO::HideProgressInfo
     connect(queryJob, SIGNAL( 'result( KJob* )' ), videoList) do |aJob|
       JSON.parse( aJob.data.data )["feed"]["entry"].each do |entry|
@@ -181,6 +181,15 @@ class YoutubeVideo < Video
           videoList.queryVeto -= 1
         end
       end
+    end
+  end
+
+  SUGGEST_URL = 'http://suggestqueries.google.com/complete/search?hl=en&ds=yt&nolabels=t&json=t&q=%s'
+  def self.suggest searchWidget, query
+    suggestUrl = KDE::Url.new (SUGGEST_URL % (KDE::Url.to_percent_encoding query))
+    suggestRequestJob = KIO::storedGet suggestUrl , KIO::NoReload, KIO::HideProgressInfo
+    connect(suggestRequestJob, SIGNAL( 'result( KJob* )' ), searchWidget) do |aJob|
+      searchWidget.completed_items = JSON.parse(aJob.data.data)[1]
     end
   end
 
@@ -212,23 +221,6 @@ class YoutubeVideo < Video
     elsif @video_url != false
       emit got_video_url(Qt::Variant.from_value(self))
     end
-  end
-
-  class QueryCompletition < KDE::Completion
-    URL = 'http://suggestqueries.google.com/complete/search?json=t&hl=en&q=%s&nolabels=t'
-    def initialize
-      super()
-      self.completion_mode = KDE::GlobalSettings::CompletionPopupAuto
-    end
-
-    def make_completion text
-      puts text
-      r = text + 'RRR'
-      emit match(r)
-      r
-    end
-    alias :makeCompletion :make_completion
-
   end
 end
 
@@ -609,15 +601,9 @@ class ListView < Qt::ListView
       end
     end
 
-    @searchWidget.clear_button_shown = true
     @searchWidget.connect( SIGNAL :returnPressed ) do
-      @videoList.query @searchWidget.text
-      @searchWidget.clear
-    end
-    if @provider.constants.include? :QueryCompletition
-      @searchWidget.completion_object = @provider::QueryCompletition.new
-      @searchWidget.auto_delete_completion_object = true
-#       connect(@searchWidget,SIGNAL('userTextChanged(QString)'),@searchWidget,SIGNAL('completion(QString)'))
+      @videoList.query @searchWidget.line_edit.text
+      @searchWidget.line_edit.clear
     end
   end
 
@@ -626,6 +612,16 @@ class ListView < Qt::ListView
   end
   alias :resizeEvent :resize_event
 
+end
+
+class HistoryComboBox < KDE::ComboBox # < KDE::HistoryComboBox
+  def initialize parent
+    super(true, parent)
+    self.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
+    self.set_minimum_size(200,0)
+    self.duplicates_enabled = false
+    self.completion_mode = KDE::GlobalSettings::CompletionPopupAuto
+  end
 end
 
 class MainWindow < KDE::MainWindow
@@ -777,9 +773,19 @@ class MainWindow < KDE::MainWindow
     self.add_dock_widget Qt::LeftDockWidgetArea, dock
 
     # add search field
-    @searchWidget = KDE::LineEdit.new self
+    @suggestTimer = Qt::Timer.new self
+    @suggestTimer.single_shot = true
+    connect(@suggestTimer,SIGNAL(:timeout)) do
+      unless @searchWidget.line_edit.text.empty?
+        YoutubeVideo.suggest(@searchWidget, @searchWidget.line_edit.text)
+      end
+    end
+    @searchWidget = HistoryComboBox.new self
+    connect(@searchWidget.line_edit,SIGNAL('userTextChanged(QString)')) do
+      @suggestTimer.stop if @suggestTimer.active?
+      @suggestTimer.start 400 # in ms
+    end
     @searchWidget.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
-    @searchWidget.set_minimum_size(150,0)
     controlBar.add_widget @searchWidget
 
     @listWidget = ListView.new dock, YoutubeVideo, @videoPlayer, @searchWidget
