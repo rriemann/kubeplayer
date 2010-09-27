@@ -1,7 +1,7 @@
 =begin
 ** Form generated from reading ui file 'DlgYoutubeBase.ui'
 **
-** Created: Mi. Aug 18 23:56:09 2010
+** Created: Do. Aug 19 12:09:32 2010
 **      by: Qt User Interface Compiler version 4.6.3
 **
 ** WARNING! All changes made in this file will be lost when recompiling ui file!
@@ -63,16 +63,16 @@ class Ui_DlgYoutubeBase
     end
 
     def retranslateUi(dlgYoutubeBase)
-    dlgYoutubeBase.windowTitle = Qt::Application.translate("DlgYoutubeBase", "Form", nil, Qt::Application::UnicodeUTF8)
-    @groupBox.title = Qt::Application.translate("DlgYoutubeBase", "Quality", nil, Qt::Application::UnicodeUTF8)
-    @label.text = Qt::Application.translate("DlgYoutubeBase", "Maximum Video Quality:", nil, Qt::Application::UnicodeUTF8)
-    @kcfg_Quality.insertItems(0, [Qt::Application.translate("DlgYoutubeBase", "400x240", "5", Qt::Application::UnicodeUTF8),
-        Qt::Application.translate("DlgYoutubeBase", "640x360", "34", Qt::Application::UnicodeUTF8),
-        Qt::Application.translate("DlgYoutubeBase", "854x480", "35", Qt::Application::UnicodeUTF8),
-        Qt::Application.translate("DlgYoutubeBase", "480x360", "18", Qt::Application::UnicodeUTF8),
-        Qt::Application.translate("DlgYoutubeBase", "1280x720", "22", Qt::Application::UnicodeUTF8),
-        Qt::Application.translate("DlgYoutubeBase", "1920x1080", "37", Qt::Application::UnicodeUTF8),
-        Qt::Application.translate("DlgYoutubeBase", "4096x3072", "38", Qt::Application::UnicodeUTF8)])
+    dlgYoutubeBase.windowTitle = KDE::i18n("Form", nil)
+    @groupBox.title = KDE::i18n("Quality", nil)
+    @label.text = KDE::i18n("Maximum Video Quality:", nil)
+    @kcfg_Quality.insertItems(0, [KDE::i18n("400x240", nil),
+        KDE::i18n("640x360", nil),
+        KDE::i18n("854x480", nil),
+        KDE::i18n("480x360", nil),
+        KDE::i18n("1280x720", nil),
+        KDE::i18n("1920x1080", nil),
+        KDE::i18n("4096x3072", nil)])
     end # retranslateUi
 
     def retranslate_ui(dlgYoutubeBase)

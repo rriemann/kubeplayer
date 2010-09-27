@@ -45,37 +45,37 @@
          <widget class="KComboBox" name="kcfg_Quality">
           <item>
            <property name="text">
-            <string comment="5">400x240</string>
+            <string notr="true">r400x240</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string comment="34">640x360</string>
+            <string notr="true">r640x360</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string comment="35">854x480</string>
+            <string notr="true">r854x480</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string comment="18">480x360</string>
+            <string notr="true">r480x360</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string comment="22">1280x720</string>
+            <string notr="true">r1280x720</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string comment="37">1920x1080</string>
+            <string notr="true">r1920x1080</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string comment="38">4096x3072</string>
+            <string notr="true">r4096x3072</string>
            </property>
           </item>
          </widget>

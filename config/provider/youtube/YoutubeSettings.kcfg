@@ -4,11 +4,18 @@
       xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
                           http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
   <kcfgfile/>
-<!--   <include>kglobalsettings.h</include> -->
   <group name="youtube">
-    <entry name="Quality" type="Int">
+    <entry name="Quality" type="Enum">
       <label>Maximum quality format for videos.</label>
-      <default>18</default>
+      <default>R480x360</default>
+      <choices>
+        <choice name="R640x360" />
+        <choice name="R854x480" />
+        <choice name="R480x360" />
+        <choice name="R1280x720" />
+        <choice name="R1920x1080" />
+        <choice name="R4096x3072" />
+      </choices>
     </entry>
   </group>
 </kcfg>

@@ -5,6 +5,17 @@ require 'singleton'
 
 class YoutubeSettings < KDE::ConfigSkeleton
   include Singleton
+
+  class EnumQuality
+    R640x360 = 0
+    R854x480 = 1
+    R480x360 = 2
+    R1280x720 = 3
+    R1920x1080 = 4
+    R4096x3072 = 5
+    COUNT = 6
+  end
+
   #
   # Set Maximum quality format for videos.
   #
@@ -24,7 +35,7 @@ class YoutubeSettings < KDE::ConfigSkeleton
   #
   def quality
     @quality = findItem("Quality").property
-    return @quality.value
+    return @quality.toInt
   end
 
   def initialize()
@@ -34,7 +45,26 @@ class YoutubeSettings < KDE::ConfigSkeleton
     @quality = Qt::Variant.fromValue(0)
     setCurrentGroup("youtube")
 
-    itemQuality = ItemInt.new(currentGroup(), "Quality", @quality.value, 18)
+    valuesQuality = []
+    choice = ItemEnum::Choice.new
+    choice.name = "R640x360"
+    valuesQuality << choice
+    choice = ItemEnum::Choice.new
+    choice.name = "R854x480"
+    valuesQuality << choice
+    choice = ItemEnum::Choice.new
+    choice.name = "R480x360"
+    valuesQuality << choice
+    choice = ItemEnum::Choice.new
+    choice.name = "R1280x720"
+    valuesQuality << choice
+    choice = ItemEnum::Choice.new
+    choice.name = "R1920x1080"
+    valuesQuality << choice
+    choice = ItemEnum::Choice.new
+    choice.name = "R4096x3072"
+    valuesQuality << choice
+    itemQuality = ItemEnum.new(currentGroup(), "Quality", @quality.toInt, valuesQuality, EnumQuality::R480x360)
     itemQuality.property = @quality
     addItem(itemQuality)
     readConfig
