@@ -1,6 +1,3 @@
-require 'lib/provider/youtube/YoutubeSettings'
-require 'lib/provider/youtube/DlgYoutubeBase'
-
 module Youtube
 
 class Video < KubePlayer::Video
