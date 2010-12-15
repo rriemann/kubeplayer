@@ -138,5 +138,5 @@ end
 
 end
 
-require 'lib/provider/youtube/Youtube'
+require 'provider/youtube/Youtube'
 KubePlayer::Video.register_provider Youtube::Video
