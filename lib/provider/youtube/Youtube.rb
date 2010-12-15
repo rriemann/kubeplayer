@@ -42,7 +42,7 @@ class Video < KubePlayer::Video
 
   SUGGEST_URL = 'http://suggestqueries.google.com/complete/search?hl=en&ds=yt&nolabels=t&json=t&q=%s'
   def self.suggest searchWidget, query
-    suggestUrl = KDE::Url.new (SUGGEST_URL % (KDE::Url.to_percent_encoding query))
+    suggestUrl = KDE::Url.new(SUGGEST_URL % (KDE::Url.to_percent_encoding query))
     suggestRequestJob = KIO::storedGet suggestUrl , KIO::NoReload, KIO::HideProgressInfo
     connect(suggestRequestJob, SIGNAL( 'result( KJob* )' ), searchWidget) do |aJob|
       searchWidget.completed_items = JSON.parse(aJob.data.data)[1]
@@ -58,7 +58,7 @@ class Video < KubePlayer::Video
     if @video_url == nil
       @video_url = false
       @id = @url.url.match(/\bv=([^&]+)/)[1]
-      infoRequestUrl = KDE::Url.new (REQUEST_URL % @id)
+      infoRequestUrl = KDE::Url.new(REQUEST_URL % @id)
       # infoRequestUrl.add_query_item 'video_id', @id
       infoRequestJob = KIO::storedGet infoRequestUrl , KIO::NoReload, KIO::HideProgressInfo
       infoRequestJob.add_meta_data 'cookies', 'none'
