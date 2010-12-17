@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Kubeplayer
 GenericName=Multiplatform online video player
-Exec=kubeplayer %i %m -caption "%c"
+Exec=kubeplayer %i -caption "%c"
 Icon=plasma
 Type=Application
 DocPath=kubeplayer/kubeplayer.html
