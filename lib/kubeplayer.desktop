@@ -4,6 +4,6 @@ GenericName=Multiplatform online video player
 Exec=kubeplayer %i -caption "%c"
 Icon=plasma
 Type=Application
-DocPath=kubeplayer/kubeplayer.html
+X-DocPath=kubeplayer/index.html
 Comment=Multiplatform online video player.
 Terminal=false
