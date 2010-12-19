@@ -1,9 +1,24 @@
 [Desktop Entry]
 Name=Kubeplayer
+Name[nl]=Kube-afspeler
+Name[pt]=Kubeplayer
+Name[sv]=Kubeplayer
+Name[uk]=Kubeplayer
+Name[x-test]=xxKubeplayerxx
 GenericName=Multiplatform online video player
+GenericName[nl]=Online videospeler op meerdere platforms
+GenericName[pt]=Leitor de vídeo multi-plataforma 'online'
+GenericName[sv]=Direktvideospelare för flera plattformar
+GenericName[uk]=Інтернет-відеопрогравач, що може працювати на різних програмних платформах
+GenericName[x-test]=xxMultiplatform online video playerxx
 Exec=kubeplayer %i -caption "%c"
 Icon=plasma
 Type=Application
 X-DocPath=kubeplayer/index.html
 Comment=Multiplatform online video player.
+Comment[nl]=Online videospeler op meerdere platforms.
+Comment[pt]=Um leitor de vídeo multi-plataforma 'online'.
+Comment[sv]=Direktvideospelare för flera plattformar
+Comment[uk]=Інтернет-відеопрогравач, що може працювати на різних програмних платформах.
+Comment[x-test]=xxMultiplatform online video player.xx
 Terminal=false
