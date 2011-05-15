@@ -20,13 +20,13 @@ def start_kubeplayer
     "kubeplayer",
     "kubeplayer",
     KDE.ki18n("Kube Player"),
-    "0.1",
+    "1.0",
     KDE::ki18n("A video player dedicated to play online videos."),
     KDE::AboutData::License_GPL_V3,
     KDE::ki18n("(c) 2010, Robert Riemann"),
     KDE::ki18n("Kube Player is a dedicated to play online videos without the need of flash.\nIf you find a bug, please report it to <a href=\"http://github.com/saLOUt/kubeplayer/issues\">http://github.com/saLOUt/kubeplayer/issues</a>."),
     "http://github.com/saLOUt/kubeplayer", "saloution@googlemail.com" )
-  about.setProgramIconName  "plasma" # use the plasma-icon instead of question mark
+  # about.setProgramIconName  "" # use the plasma-icon instead of question mark
 
   KDE::CmdLineArgs.init(ARGV, about)
 
