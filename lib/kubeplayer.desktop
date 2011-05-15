@@ -41,3 +41,5 @@ Comment[sv]=Direktvideospelare för flera plattformar
 Comment[uk]=Інтернет-відеопрогравач, що може працювати на різних програмних платформах.
 Comment[x-test]=xxMultiplatform online video player.xx
 Terminal=false
+Categories=Qt;KDE;AudioVideo;Player;Video;
+
