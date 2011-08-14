@@ -66,9 +66,22 @@ class Video < KubePlayer::Video
           metaInfo[match.pre_match.to_sym] = KDE::Url::fromPercentEncoding(Qt::ByteArray.new match.post_match)
         end
         @fmtUrlMap = {}
-        metaInfo[:fmt_url_map].scan(/(\d+)\|([^,]+)/).each {|quality,url| @fmtUrlMap[quality.to_i] = url}
-        @video_url = KDE::Url.new @fmtUrlMap.max[1]
-        emit got_video_url(Qt::Variant.from_value(self))
+        if metaInfo[:fmt_url_map]
+          metaInfo[:fmt_url_map].scan(/(\d+)\|([^,]+)/).each {|quality,url| @fmtUrlMap[quality.to_i] = url}
+        elsif metaInfo[:url_encoded_fmt_stream_map]
+          (','+KDE::Url::fromPercentEncoding(Qt::ByteArray.new(metaInfo[:url_encoded_fmt_stream_map]))).split(',url=')[2..-1].each do |w|
+            @fmtUrlMap[w.match(/\d+$/).to_s.to_i] = w.sub(/&type.*$/,'')
+          end
+        end
+        # http://en.wikipedia.org/wiki/YouTube#Quality_and_codecs
+        @fmtUrlMap.delete_if {|fmt,url| fmt > 40} # FIXME to bypass problems with webm (phonon?)
+        if video = @fmtUrlMap.max
+          @video_url = KDE::Url.new video[1]
+          emit got_video_url(Qt::Variant.from_value(self))
+        else
+          STDERR.puts "no accessible video found"
+          KDE::MessageBox.messageBox(nil, KDE::MessageBox::Sorry, "It was not possible to grap an accessible video.", "Youtube Video Plugin")
+        end
       end
     elsif @video_url != false
       emit got_video_url(Qt::Variant.from_value(self))
