@@ -127,26 +127,6 @@ class MainWindow < KDE::MainWindow
 
     ini_phonon collection, menu, controlBar
 
-    menu = KDE::Menu.new i18n('&Settings'), self
-    menuBar.add_menu menu
-
-    action = collection.add_action 'configure', KDE::Action.new( self )
-    action.icon = KDE::Icon.new 'configure'
-    action.text = i18n '&Settings'
-    connect( action, SIGNAL(:triggered), self) do
-      unless KDE::ConfigDialog::show_dialog 'settings' # if not already open do...
-        dialog = KDE::ConfigDialog.new self, 'settings', KDE::ConfigSkeleton.new
-        generalpage = Qt::Widget.new dialog
-        dialog.add_page generalpage, i18n('General'), '', i18n('General Settings')
-        Video.dlg_setup dialog
-        dialog.show
-      end
-    end
-    menu.add_action action
-
-    action = collection.add_action 'configure-keys', KDE::StandardAction::keyBindings( self, SLOT( :configureKeys ), collection )
-    menu.add_action action
-
     menuBar.add_menu helpMenu
 
     collection.associate_widget self
