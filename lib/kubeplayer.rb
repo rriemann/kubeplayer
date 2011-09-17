@@ -30,6 +30,10 @@ def start_kubeplayer
 
   KDE::CmdLineArgs.init(ARGV, about)
 
+  options = KDE::CmdLineOptions.new
+  options.add "+[url]", KDE::ki18n("URL to open")
+  KDE::CmdLineArgs::addCmdLineOptions options
+
 #   unless KDE::UniqueApplication.start
 #     STDERR.puts "is already running."
 #   else

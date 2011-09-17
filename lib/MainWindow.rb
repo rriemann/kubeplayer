@@ -169,6 +169,23 @@ class MainWindow < KDE::MainWindow
     @listWidget = ListView.new dock, Youtube::Video, @videoPlayer, @searchWidget
     dock.widget = @listWidget
 
+    args = KDE::CmdLineArgs::parsedArgs
+    if args.count > 0
+      video = Video::get_type args.url(0) #args.url(0) returns class kurl
+      if video
+        connect(video, SIGNAL('got_video_url(QVariant)')) do |variant|
+          video = variant.value
+          @videoPlayer.play Phonon::MediaSource.new video.video_url
+        end
+        video.request_video_url
+        dock.hide
+      else
+        msg = "The given URL #{args.url(0).url} could not be loaded, because this video website is not supported. <br /> You may want to file a feature request."
+        STDERR.puts msg
+        KDE::MessageBox.messageBox(nil, KDE::MessageBox::Sorry, msg, "No supported URL")
+      end
+    end
+
     self.show
   end
 
