@@ -101,20 +101,6 @@ class Video < KubePlayer::Video
       emit got_video_url(Qt::Variant.from_value(self))
     end
   end
-
-  def self.dlg_setup dialog
-    youtubepage = DlgYoutube.new dialog
-    dialog.add_page youtubepage, YoutubeSettings.instance, 'Youtube', '', i18n('Youtube Settings')
-  end
-end
-
-class DlgYoutube < Qt::Widget
-  def initialize parent
-    super
-
-    ui = Ui::DlgYoutubeBase.new
-    ui.setup_ui self
-  end
 end
 
 end
