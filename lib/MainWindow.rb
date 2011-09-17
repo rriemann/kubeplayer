@@ -182,9 +182,9 @@ class MainWindow < KDE::MainWindow
         video.request_video_url
         #dock.hide
       else
-        msg = "The given URL #{args.url(0).url} could not be loaded, because this video website is not supported. <br /> You may want to file a feature request."
+        msg = KDE::i18n "The given URL <a href='%1'>%1</a> is not supported, because there is appropriate website plugin.<br />You may want to file a feature request.", kurl.url
         STDERR.puts msg
-        KDE::MessageBox.messageBox(nil, KDE::MessageBox::Sorry, msg, "No supported URL")
+        KDE::MessageBox.messageBox nil, KDE::MessageBox::Sorry, msg, i18n("No supported URL")
       end
   end
 
