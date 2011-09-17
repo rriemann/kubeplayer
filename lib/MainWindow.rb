@@ -142,13 +142,13 @@ class MainWindow < KDE::MainWindow
     menuBar.add_menu menu
 
     # add clip list dock widget
-    dock = Qt::DockWidget.new self
-    action = collection.add_action 'toogle-listwidgetcontainer-dock', dock.toggle_view_action
+    @listDock = Qt::DockWidget.new self
+    action = collection.add_action 'toogle-listwidgetcontainer-dock', @listDock.toggle_view_action
     menu.add_action action
-    dock.objectName = "listWidgetContainerDock"
-    dock.windowTitle = "Clips"
-    dock.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
-    self.add_dock_widget Qt::LeftDockWidgetArea, dock
+    @listDock.objectName = "listWidgetContainerDock"
+    @listDock.windowTitle = "Clips"
+    @listDock.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
+    self.add_dock_widget Qt::LeftDockWidgetArea, @listDock
 
     # add search field
     @suggestTimer = Qt::Timer.new self
@@ -166,8 +166,8 @@ class MainWindow < KDE::MainWindow
     @searchWidget.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
     controlBar.add_widget @searchWidget
 
-    @listWidget = ListView.new dock, Youtube::Video, @videoPlayer, @searchWidget
-    dock.widget = @listWidget
+    @listWidget = ListView.new @listDock, Youtube::Video, @videoPlayer, @searchWidget, @listDock
+    @listDock.widget = @listWidget
 
     self.show
   end
@@ -180,7 +180,7 @@ class MainWindow < KDE::MainWindow
           @videoPlayer.play Phonon::MediaSource.new video.video_url
         end
         video.request_video_url
-        #dock.hide
+        @listDock.hide
       else
         msg = KDE::i18n "The given URL <a href='%1'>%1</a> is not supported, because there is appropriate website plugin.<br />You may want to file a feature request.", kurl.url
         STDERR.puts msg

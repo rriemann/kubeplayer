@@ -158,7 +158,7 @@ class ListView < Qt::ListView
 
   attr_accessor :videoList
 
-  def initialize parent, providerClass, videoPlayer, searchWidget
+  def initialize parent, providerClass, videoPlayer, searchWidget, listDock
     super(parent)
     # self.view_mode = Qt::ListView::ListMode
     self.item_delegate = VideoItemDelegate.new(self)
@@ -172,6 +172,7 @@ class ListView < Qt::ListView
     @provider = providerClass
     @videoPlayer = videoPlayer
     @searchWidget = searchWidget
+    @listDock = listDock
 
     @videoList =  VideoList.new @provider
     self.model = @videoList
@@ -203,6 +204,7 @@ class ListView < Qt::ListView
     @searchWidget.connect( SIGNAL :returnPressed ) do
       @videoList.query @searchWidget.line_edit.text
       @searchWidget.line_edit.clear
+      @listDock.show
     end
   end
 
