@@ -11,6 +11,7 @@ require 'pp'
 $basedir = File.dirname(__FILE__)
 $:.unshift($basedir)
 
+require 'Application'
 require 'Video'
 require 'List'
 require 'MainWindow'
@@ -34,14 +35,15 @@ def start_kubeplayer
   options.add "+[url]", KDE::ki18n("URL to open")
   KDE::CmdLineArgs::addCmdLineOptions options
 
-#   unless KDE::UniqueApplication.start
-#     STDERR.puts "is already running."
-#   else
-#     a = KDE::UniqueApplication.new
-#     w = Kube::MainWindow.new
-#     a.exec
-#   end
-  a = KDE::Application.new
-  w = KubePlayer::MainWindow.new
-  a.exec
+  unless KubePlayer::UniqueApplication.start
+    STDERR.puts "is already running."
+  else
+    a = KubePlayer::UniqueApplication.new
+    w = KubePlayer::MainWindow.new
+    Qt::Object.connect(a, SIGNAL('got_video_request(KUrl)'), w, SLOT('handle_video_request(KUrl)'))
+    a.exec
+  end
+#   a = KDE::Application.new
+#   w = KubePlayer::MainWindow.new
+#   a.exec
 end

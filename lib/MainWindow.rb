@@ -13,7 +13,7 @@ end
 
 class MainWindow < KDE::MainWindow
 
-  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)'
+  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)', 'handle_video_request(KUrl)'
 
   def stateChanged state, stateBefore
     case state
@@ -169,24 +169,23 @@ class MainWindow < KDE::MainWindow
     @listWidget = ListView.new dock, Youtube::Video, @videoPlayer, @searchWidget
     dock.widget = @listWidget
 
-    args = KDE::CmdLineArgs::parsedArgs
-    if args.count > 0
-      video = Video::get_type args.url(0) #args.url(0) returns class kurl
+    self.show
+  end
+
+  def handle_video_request kurl
+      video = Video::get_type kurl
       if video
         connect(video, SIGNAL('got_video_url(QVariant)')) do |variant|
           video = variant.value
           @videoPlayer.play Phonon::MediaSource.new video.video_url
         end
         video.request_video_url
-        dock.hide
+        #dock.hide
       else
         msg = "The given URL #{args.url(0).url} could not be loaded, because this video website is not supported. <br /> You may want to file a feature request."
         STDERR.puts msg
         KDE::MessageBox.messageBox(nil, KDE::MessageBox::Sorry, msg, "No supported URL")
       end
-    end
-
-    self.show
   end
 
 end
