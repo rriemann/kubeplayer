@@ -1,6 +1,7 @@
 [Desktop Entry]
 Name=Kubeplayer
 Name[cs]=Kubeplayer
+Name[da]=Kubeplayer
 Name[de]=Kubeplayer
 Name[es]=Kubeplayer
 Name[et]=Kubeplayer
@@ -15,6 +16,7 @@ Name[uk]=Kubeplayer
 Name[x-test]=xxKubeplayerxx
 Name[zh_CN]=Kubeplayer
 GenericName=Multiplatform online video player
+GenericName[da]=Online videoafspiller til flere platforme
 GenericName[de]=Wiedergabe von Online-Videos
 GenericName[es]=Reproductor de vídeo en línea multiplataforma
 GenericName[et]=Mitmeplatvormne võrgu-videomängija
@@ -32,6 +34,7 @@ Icon=kubeplayer
 Type=Application
 X-DocPath=kubeplayer/index.html
 Comment=Multiplatform online video player.
+Comment[da]=Online videoafspiller til flere platforme.
 Comment[de]=Wiedergabe von Online-Videos.
 Comment[es]=Reproductor de vídeo en línea multiplataforma.
 Comment[et]=Mitmeplatvormne võrgu-videomängija.
