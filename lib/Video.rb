@@ -117,6 +117,7 @@ class Video < Qt::Object
   attr_reader :video_url
 
   attr_reader :filename
+  attr_reader :fileextension
 
   attr_reader :resolution
 
@@ -132,6 +133,7 @@ class Video < Qt::Object
     @duration = nil
     @resolution = nil
     @filename = nil
+    @fileextension = nil
   end
 
   def to_s

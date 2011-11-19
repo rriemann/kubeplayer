@@ -98,8 +98,10 @@ class Video < KubePlayer::Video
           # STDERR.puts "available formats: #{@fmtUrlMap.keys.map {|k| NUMBER2FORMAT[k]}.join(' ')}"
           fmtUrlMap_by_Resolution = {}
           @fmtUrlMap.each {|k,v| fmtUrlMap_by_Resolution[NUMBER2RESOLUTION[k]] = [k, v] }
+          # STDERR.puts fmtUrlMap_by_Resolution.inspect
           @resolution, video = fmtUrlMap_by_Resolution.max
-          @filename = "#{metaInfo[:title].gsub('+','_')}.#{NUMBER2FORMAT[video[0]]}"
+          @fileextension = NUMBER2FORMAT[video[0]]
+          @filename = "#{metaInfo[:title].gsub('+','_')}.#{@fileextension}"
           # STDERR.puts "#{resolution}p, #{@filename}"
           @video_url = KDE::Url.new video[1]
           emit got_video_url(Qt::Variant.from_value(self))

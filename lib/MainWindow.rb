@@ -104,6 +104,19 @@ class MainWindow < KDE::MainWindow
     action.default_widget = @seekSlider
     controlBar.add_action action
 
+    @resolutionLabel = Qt::Label.new self
+    controlBar.add_widget @resolutionLabel
+
+    action = collection.add_action 'download', KDE::Action.new( KDE::Icon.new( 'download' ), i18n( 'Download' ), self )
+    action.connect( SIGNAL( :triggered ) ) do
+      if @video
+        STDERR.puts @video.filename
+        saveTo = KDE::FileDialog::getSaveUrl(KDE::Url.new, "*.#{@video.fileextension.to_s}")
+        KIO::file_copy(@video.video_url, saveTo)
+      end
+    end
+    controlBar.add_action action
+
   end
 
   def initialize
@@ -176,8 +189,9 @@ class MainWindow < KDE::MainWindow
       video = Video::get_type kurl
       if video
         connect(video, SIGNAL('got_video_url(QVariant)')) do |variant|
-          video = variant.value
-          @videoPlayer.play Phonon::MediaSource.new video.video_url
+          @video = variant.value
+          @videoPlayer.play Phonon::MediaSource.new @video.video_url
+          @resolutionLabel.text = "#{@video.resolution}p"
         end
         video.request_video_url
         @listDock.hide
