@@ -1,8 +1,24 @@
+class Hash
+  def custom_revert
+    r = Hash.new
+    each {|k,v| v.each {|v| r[v] = k} }
+    r
+  end
+end
+
 module Youtube
 
 class Video < KubePlayer::Video
 
   VALID_URL = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
+
+  # http://en.wikipedia.org/wiki/YouTube#Quality_and_codecs
+  FORMAT2NUMBER = {:flv => [5, 6, 34, 35], :mp4 => [18, 22, 37, 38, 83, 82, 85, 84], :webm => [43, 44, 45, 100, 101, 46, 102] , :'3gp' => [13, 17]}
+  NUMBER2FORMAT = FORMAT2NUMBER.custom_revert
+
+  RESOLUTION2NUMBER = {224 => [5, 6], 240 => [83], 360 => [34, 18, 82, 43, 100], 480 => [35, 44, 101], 520 => [85], 540 => [46], 720 => [22, 84, 45, 102], 1080 => [37], 2304 => [38]}
+  NUMBER2RESOLUTION = RESOLUTION2NUMBER.custom_revert
+
   #:call-seq:
   #  accept?(KDE::Url) => bool
   def self.accept? kurl
@@ -76,9 +92,15 @@ class Video < KubePlayer::Video
             @fmtUrlMap[w.match(/\d+$/).to_s.to_i] = w.sub(/&type.*$/,'')
           end
         end
-        # http://en.wikipedia.org/wiki/YouTube#Quality_and_codecs
-        @fmtUrlMap.delete_if {|fmt,url| fmt > 40} # FIXME to bypass problems with webm (phonon?)
-        if metaInfo[:status] == "ok" and video = @fmtUrlMap.max
+        @fmtUrlMap.delete_if {|fmt,url| NUMBER2FORMAT[fmt] == :webm} # FIXME to bypass problems with webm (phonon?)
+        if metaInfo[:status] == "ok" and not @fmtUrlMap.empty?
+          # TODO Let the user prefere different formats (not using @fmtUrlMap.max automatically)
+          # STDERR.puts "available formats: #{@fmtUrlMap.keys.map {|k| NUMBER2FORMAT[k]}.join(' ')}"
+          fmtUrlMap_by_Resolution = {}
+          @fmtUrlMap.each {|k,v| fmtUrlMap_by_Resolution[NUMBER2RESOLUTION[k]] = [k, v] }
+          @resolution, video = fmtUrlMap_by_Resolution.max
+          @filename = "#{metaInfo[:title].gsub('+','_')}.#{NUMBER2FORMAT[video[0]]}"
+          # STDERR.puts "#{resolution}p, #{@filename}"
           @video_url = KDE::Url.new video[1]
           emit got_video_url(Qt::Variant.from_value(self))
         else

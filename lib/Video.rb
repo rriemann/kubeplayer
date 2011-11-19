@@ -116,6 +116,10 @@ class Video < Qt::Object
 
   attr_reader :video_url
 
+  attr_reader :filename
+
+  attr_reader :resolution
+
   def initialize kurl
     super()
     @url = kurl
@@ -126,6 +130,8 @@ class Video < Qt::Object
     @author = nil
     @published = Qt::DateTime.new # dateTime # FIXME
     @duration = nil
+    @resolution = nil
+    @filename = nil
   end
 
   def to_s
