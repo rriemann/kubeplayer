@@ -101,10 +101,11 @@ class Video < KubePlayer::Video
           # STDERR.puts fmtUrlMap_by_Resolution.inspect
           @resolution, video = fmtUrlMap_by_Resolution.max
           @fileextension = NUMBER2FORMAT[video[0]]
-          @filename = "#{metaInfo[:title].gsub('+','_')}.#{@fileextension}"
+          # @filename = "#{metaInfo[:title].gsub('+',' ')}.#{@fileextension}"
+          @filename = "#{KDE::Url::fromPercentEncoding(Qt::ByteArray.new(metaInfo[:title])).gsub('+',' ')}.#{@fileextension}"
           # STDERR.puts "#{resolution}p, #{@filename}"
           @video_url = KDE::Url.new video[1]
-          emit got_video_url(Qt::Variant.from_value(self))
+          emit got_video_url
         else
           if @el_mode_index < EL_MODE.size - 1
             @el_mode_index += 1
@@ -122,7 +123,7 @@ class Video < KubePlayer::Video
         end
       end
     elsif @video_url != false
-      emit got_video_url(Qt::Variant.from_value(self))
+      emit got_video_url
     end
   end
 end

@@ -58,7 +58,7 @@ class Video < Qt::Object
   attr_accessor :title
 
 
-  signals :got_thumbnail, 'got_video_url(QVariant)'
+  signals :got_thumbnail, 'got_video_url()'
 
   #:call-seq:
   # thumbnail_url() => KDE::Url
@@ -136,9 +136,11 @@ class Video < Qt::Object
     @fileextension = nil
   end
 
+=begin
   def to_s
-    @title or '[unbenannt]'
+    "<#{@title or '[unbenannt]'}>"
   end
+=end
 
    # FIXME (this implementation doesn't work to protect the constructor
   protected :initialize

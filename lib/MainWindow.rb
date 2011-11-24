@@ -13,7 +13,9 @@ end
 
 class MainWindow < KDE::MainWindow
 
-  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)', 'handle_video_request(KUrl)'
+  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)', 'handle_video_request(KUrl)', 'request_play()'
+
+  attr_reader :activeVideo
 
   def stateChanged state, stateBefore
     case state
@@ -30,6 +32,11 @@ class MainWindow < KDE::MainWindow
       @playPauseAction.enabled = false # unless state == Phonon::BufferingState
     end
   end
+
+  def activeVideo= video
+    @activeVideo = video
+    video.request_video_url
+  end  
 
   def ini_phonon collection, menu, controlBar
     @videoPlayer = Phonon::VideoPlayer.new Phonon::VideoCategory, self
@@ -109,10 +116,29 @@ class MainWindow < KDE::MainWindow
 
     action = collection.add_action 'download', KDE::Action.new( KDE::Icon.new( 'download' ), i18n( 'Download' ), self )
     action.connect( SIGNAL( :triggered ) ) do
-      if @video
-        STDERR.puts @video.filename
-        saveTo = KDE::FileDialog::getSaveUrl(KDE::Url.new, "*.#{@video.fileextension.to_s}")
-        KIO::file_copy(@video.video_url, saveTo)
+      if @activeVideo
+        # saveTo = KDE::FileDialog::getSaveUrl(KDE::Url.new, "*.#{@activeVideo.fileextension.to_s}")
+
+        unless KDE::StandardDirs::findExe('kget').nil?
+          unless Qt::DBusConnection::sessionBus().interface().isServiceRegistered("org.kde.kget").value # QDBusReply<bool>, bool via reply.value
+            KDE::ToolInvocation::kdeinitExecWait("kget")
+          end
+          kget = Qt::DBusInterface.new("org.kde.kget", "/KGet", "org.kde.kget.main")
+          if kget.isValid
+            # transfer = kget.call("addTransfer", @activeVideo.video_url.prettyUrl(), @activeVideo.filename, false);
+            transfer = kget.call("showNewTransferDialog", [@activeVideo.video_url.prettyUrl, '~/' + @activeVideo.filename])
+            # kget.call("showNewTransferDialog", [@activeVideo.video_url.prettyUrl]) # FIXME just takes playpack as filename
+          end
+        end
+        # KIO::file_copy(@video.video_url, saveTo)
+      end
+    end
+    controlBar.add_action action
+
+    action = collection.add_action 'open-browser', KDE::Action.new( KDE::Icon.new( 'applications-internet' ), i18n( 'Open in Browser' ), self )
+    action.connect( SIGNAL( :triggered ) ) do
+      if @activeVideo
+        Qt::DesktopServices::openUrl @activeVideo.url
       end
     end
     controlBar.add_action action
@@ -179,27 +205,36 @@ class MainWindow < KDE::MainWindow
     @searchWidget.set_size_policy(Qt::SizePolicy::Fixed, Qt::SizePolicy::Fixed)
     controlBar.add_widget @searchWidget
 
-    @listWidget = ListView.new @listDock, Youtube::Video, @videoPlayer, @searchWidget, @listDock
+    @listWidget = ListView.new @listDock, Youtube::Video, self, @searchWidget, @listDock
     @listDock.widget = @listWidget
 
     self.show
   end
 
+  def request_play
+    video = sender()
+    if video == @activeVideo
+      play_video video
+    end
+  end
+
+  def play_video video
+    @videoPlayer.play Phonon::MediaSource.new video.video_url
+    @resolutionLabel.text = "#{video.resolution}p"
+  end
+
   def handle_video_request kurl
-      video = Video::get_type kurl
-      if video
-        connect(video, SIGNAL('got_video_url(QVariant)')) do |variant|
-          @video = variant.value
-          @videoPlayer.play Phonon::MediaSource.new @video.video_url
-          @resolutionLabel.text = "#{@video.resolution}p"
-        end
-        video.request_video_url
-        @listDock.hide
-      else
-        msg = KDE::i18n "The given URL <a href='%1'>%1</a> is not supported, because there is appropriate website plugin.<br />You may want to file a feature request.", kurl.url
-        STDERR.puts msg
-        KDE::MessageBox.messageBox nil, KDE::MessageBox::Sorry, msg, i18n("No supported URL")
-      end
+    video = Video::get_type kurl
+    if video
+      @listDock.hide
+      self.activeVideo = video
+      connect(video, SIGNAL('got_video_url()'), self, SLOT('request_play()'))
+      video.request_video_url
+    else
+      msg = KDE::i18n "The given URL <a href='%1'>%1</a> is not supported, because there is appropriate website plugin.<br />You may want to file a feature request.", kurl.url
+      STDERR.puts msg
+      KDE::MessageBox.messageBox nil, KDE::MessageBox::Sorry, msg, i18n("No supported URL")
+    end
   end
 
 end

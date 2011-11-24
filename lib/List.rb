@@ -7,17 +7,18 @@ module KubePlayer
 class VideoList < Qt::AbstractListModel
 
   slots :update_thumbnail
-  signals 'active_row_changed(int)'
   signals 'play_this(QVariant)'
+  slots 'request_play(QVariant)'
 
   attr_reader :videos
   attr_accessor :queryVeto
 
-  def initialize providerClass, minimumSize = 0
+  def initialize providerClass, mainWindow, minimumSize = 0
     super()
     @videos = []
     @provider = providerClass
     @minimumSize = minimumSize
+    @mainWindow = mainWindow
     @activeVideo = nil
     @activeRow = nil
     @autostart = false
@@ -34,7 +35,7 @@ class VideoList < Qt::AbstractListModel
       when VideoRole then
         return Qt::Variant.from_value video
       when ActiveTrackRole then
-        return Qt::Variant.new(video == @activeVideo)
+        return Qt::Variant.new(row == @activeRow)
       when Qt::DisplayRole, Qt::StatusTipRole then
           return Qt::Variant.new video.to_s
       end
@@ -80,7 +81,7 @@ class VideoList < Qt::AbstractListModel
       @activeVideo = @videos[row]
 
       emit dataChanged(create_index(row, 0), create_index(row, column_count()-1))
-      emit active_row_changed(row)
+      @mainWindow.activeVideo = @activeVideo
     else
       @activeRow = nil
       @activeVideo = nil
@@ -100,9 +101,7 @@ class VideoList < Qt::AbstractListModel
 
   def push video
     connect video, SIGNAL(:got_thumbnail), self, SLOT(:update_thumbnail)
-    connect(video, SIGNAL('got_video_url(QVariant)')) do |variant|
-      emit play_this(variant)
-    end
+    connect video, SIGNAL(:got_video_url), @mainWindow, SLOT(:request_play)
 
     begin_insert_rows Qt::ModelIndex.new, @videos.size, @videos.size
     @videos.push video
@@ -158,7 +157,7 @@ class ListView < Qt::ListView
 
   attr_accessor :videoList
 
-  def initialize parent, providerClass, videoPlayer, searchWidget, listDock
+  def initialize parent, providerClass, mainWindow, searchWidget, listDock
     super(parent)
     # self.view_mode = Qt::ListView::ListMode
     self.item_delegate = VideoItemDelegate.new(self)
@@ -170,11 +169,11 @@ class ListView < Qt::ListView
     self.uniform_item_sizes = true
 
     @provider = providerClass
-    @videoPlayer = videoPlayer
+    @mainWindow = mainWindow
     @searchWidget = searchWidget
     @listDock = listDock
 
-    @videoList =  VideoList.new @provider
+    @videoList =  VideoList.new @provider, @mainWindow
     self.model = @videoList
 
     connect(self, SIGNAL('activated(QModelIndex)')) do |modelIndex|
@@ -185,19 +184,6 @@ class ListView < Qt::ListView
     connect(self.vertical_scroll_bar, SIGNAL('valueChanged(int)')) do |pos|
       if self.vertical_scroll_bar.maximum == pos
         @videoList.query
-      end
-    end
-
-    connect(@videoList, SIGNAL('active_row_changed(int)')) do |row|
-      video = @videoList[row]
-      @active_video = video
-      video.request_video_url
-    end
-
-    connect(@videoList, SIGNAL('play_this(QVariant)')) do |variant|
-      video = variant.value
-      if @active_video == video
-        @videoPlayer.play Phonon::MediaSource.new video.video_url
       end
     end
 
