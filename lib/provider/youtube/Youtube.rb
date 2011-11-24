@@ -53,7 +53,7 @@ class Video < KubePlayer::Video
     end
   end
 
-  SUGGEST_URL = 'http://suggestqueries.google.com/complete/search?hl=en&ds=yt&nolabels=t&json=t&q=%s'
+  SUGGEST_URL = 'http://suggestqueries.google.com/complete/search?hl=en&ds=yt&nolabels=t&json=t&output=firefox&q=%s'
   def self.suggest searchWidget, query
     suggestUrl = KDE::Url.new(SUGGEST_URL % (KDE::Url.to_percent_encoding query))
     suggestRequestJob = KIO::storedGet suggestUrl , KIO::NoReload, KIO::HideProgressInfo
