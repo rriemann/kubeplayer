@@ -113,8 +113,22 @@ class MainWindow < KDE::MainWindow
 
     @resolutionLabel = Qt::Label.new self
     controlBar.add_widget @resolutionLabel
+  end
 
+  def initialize
+
+    super
+
+    #### prepare menus
+    collection = KDE::ActionCollection.new self
+    controlBar = KDE::ToolBar.new 'control_bar', self, Qt::TopToolBarArea
+    controlBar.tool_button_style = Qt::ToolButtonIconOnly
+
+    menu = KDE::Menu.new i18n('&File'), self
+
+    # action download
     action = collection.add_action 'download', KDE::Action.new( KDE::Icon.new( 'download' ), i18n( 'Download' ), self )
+    menu.add_action action
     action.connect( SIGNAL( :triggered ) ) do
       if @activeVideo
         # saveTo = KDE::FileDialog::getSaveUrl(KDE::Url.new, "*.#{@activeVideo.fileextension.to_s}")
@@ -135,7 +149,9 @@ class MainWindow < KDE::MainWindow
     end
     controlBar.add_action action
 
+    # action open browser
     action = collection.add_action 'open-browser', KDE::Action.new( KDE::Icon.new( 'applications-internet' ), i18n( 'Open in Browser' ), self )
+    menu.add_action action
     action.connect( SIGNAL( :triggered ) ) do
       if @activeVideo
         Qt::DesktopServices::openUrl @activeVideo.url
@@ -143,23 +159,13 @@ class MainWindow < KDE::MainWindow
     end
     controlBar.add_action action
 
-  end
-
-  def initialize
-
-    super
-
-    #### prepare menus
-    collection = KDE::ActionCollection.new self
-    controlBar = KDE::ToolBar.new 'control_bar', self, Qt::TopToolBarArea
-    controlBar.tool_button_style = Qt::ToolButtonIconOnly
-
-    menu = KDE::Menu.new i18n('&File'), self
-    menuBar.add_menu menu
+    menu.add_separator
 
     action = collection.add_action 'quit', KDE::StandardAction::quit( self, SLOT( :close ), collection )
     menu.add_action action
     controlBar.add_action action
+    
+    menuBar.add_menu menu
 
     menu = KDE::Menu.new i18n('&Play'), self
     menuBar.add_menu menu
