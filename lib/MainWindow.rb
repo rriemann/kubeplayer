@@ -151,7 +151,7 @@ class MainWindow < KDE::MainWindow
 
     #### prepare menus
     collection = KDE::ActionCollection.new self
-    controlBar = KDE::ToolBar.new 'control_bar', self, Qt::BottomToolBarArea
+    controlBar = KDE::ToolBar.new 'control_bar', self, Qt::TopToolBarArea
     controlBar.tool_button_style = Qt::ToolButtonIconOnly
 
     menu = KDE::Menu.new i18n('&File'), self
@@ -172,7 +172,7 @@ class MainWindow < KDE::MainWindow
     collection.read_settings
     set_auto_save_settings
 
-    menuBar.show
+    menuBar.hide
     controlBar.show
 
     setCentralWidget @videoPlayer
@@ -188,6 +188,7 @@ class MainWindow < KDE::MainWindow
     @listDock.windowTitle = "Clips"
     @listDock.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
     self.add_dock_widget Qt::LeftDockWidgetArea, @listDock
+    controlBar.add_action action
 
     # add search field
     @suggestTimer = Qt::Timer.new self
