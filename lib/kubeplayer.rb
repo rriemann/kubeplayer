@@ -21,7 +21,7 @@ def start_kubeplayer
     "kubeplayer",
     "kubeplayer",
     KDE.ki18n("Kube Player"),
-    "1.0",
+    "1.1",
     KDE::ki18n("A video player dedicated to play online videos."),
     KDE::AboutData::License_GPL_V3,
     KDE::ki18n("(c) 2010, Robert Riemann"),
