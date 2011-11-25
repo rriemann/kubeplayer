@@ -172,7 +172,8 @@ class MainWindow < KDE::MainWindow
     collection.read_settings
     set_auto_save_settings
 
-    menuBar.hide
+    # menuBar.hide # FIXME auto-hide for tablet version
+    menuBar.show
     controlBar.show
 
     setCentralWidget @videoPlayer
