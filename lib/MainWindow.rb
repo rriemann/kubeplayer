@@ -13,7 +13,7 @@ end
 
 class MainWindow < KDE::MainWindow
 
-  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)', 'handle_video_request(KUrl)', 'request_play()'
+  slots 'toogleVolumeSlider(bool)', 'stateChanged(Phonon::State, Phonon::State)', 'handle_video_request(KUrl)', 'request_play()', 'toogleMenuBar()'
 
   attr_reader :activeVideo
 
@@ -197,6 +197,11 @@ class MainWindow < KDE::MainWindow
     self.add_dock_widget Qt::LeftDockWidgetArea, @listDock
     controlBar.add_action action
 
+    # add hide/show menu bar
+    action = collection.add_action "settings_showmenubar", KDE::StandardAction::showMenubar( self, SLOT(:toogleMenuBar), collection )
+    addAction action
+    menu.add_action action
+
     # add search field
     @suggestTimer = Qt::Timer.new self
     @suggestTimer.single_shot = true
@@ -243,6 +248,10 @@ class MainWindow < KDE::MainWindow
       STDERR.puts msg
       KDE::MessageBox.messageBox nil, KDE::MessageBox::Sorry, msg, i18n("No supported URL")
     end
+  end
+
+  def toogleMenuBar
+    menuBar.visible = sender.checked?
   end
 
 end
