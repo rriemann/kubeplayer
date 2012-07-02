@@ -13,7 +13,7 @@ class Video < KubePlayer::Video
   VALID_URL = Qt::RegExp.new 'http://www\.youtube\.com/watch\?v=[^&]+.*'
 
   # http://en.wikipedia.org/wiki/YouTube#Quality_and_codecs
-  FORMAT2NUMBER = {:flv => [5, 6, 34, 35], :mp4 => [18, 22, 37, 38, 83, 82, 85, 84], :webm => [43, 44, 45, 100, 101, 46, 102] , :'3gp' => [13, 17]}
+  FORMAT2NUMBER = {:flv => [5, 6, 34, 35], :mp4 => [18, 22, 37, 38, 83, 82, 85, 84], :webm => [43, 44, 45, 100, 101, 46, 102] , :'3gp' => [13, 17, 36]}
   NUMBER2FORMAT = FORMAT2NUMBER.custom_revert
 
   RESOLUTION2NUMBER = {224 => [5, 6], 240 => [83], 360 => [34, 18, 82, 43, 100], 480 => [35, 44, 101], 520 => [85], 540 => [46], 720 => [22, 84, 45, 102], 1080 => [37], 2304 => [38]}
@@ -93,12 +93,13 @@ class Video < KubePlayer::Video
           end
         end
         @fmtUrlMap.delete_if {|fmt,url| NUMBER2FORMAT[fmt] == :webm} # FIXME to bypass problems with webm (phonon?)
+        @fmtUrlMap.delete_if {|fmt,url| NUMBER2FORMAT[fmt] == :'3gp'} # exclude inferior format
         if metaInfo[:status] == "ok" and not @fmtUrlMap.empty?
           # TODO Let the user prefere different formats (not using @fmtUrlMap.max automatically)
           # STDERR.puts "available formats: #{@fmtUrlMap.keys.map {|k| NUMBER2FORMAT[k]}.join(' ')}"
           fmtUrlMap_by_Resolution = {}
           @fmtUrlMap.each {|k,v| fmtUrlMap_by_Resolution[NUMBER2RESOLUTION[k]] = [k, v] }
-          # STDERR.puts fmtUrlMap_by_Resolution.inspect
+          # STDERR.puts JSON.pretty_generate fmtUrlMap_by_Resolution
           @resolution, video = fmtUrlMap_by_Resolution.max
           @fileextension = NUMBER2FORMAT[video[0]]
           # @filename = "#{metaInfo[:title].gsub('+',' ')}.#{@fileextension}"
