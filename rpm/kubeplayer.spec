@@ -25,7 +25,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Summary:        Multiplatform online video player
 Version:        1.2
 Release:        1
-Source:         %{name}.tar.gz
+Source:         %{name}-%{version}.tar.gz
 BuildArch:      noarch
 %if 0%{?fedora}
 BuildRequires:  kdelibs-devel
@@ -47,7 +47,7 @@ Author(s):
 
 
 %prep
-%setup -n kubeplayer -q
+%setup -q
 
 %if 0%{?fedora}
 # mkdir $RPM_BUILD_ROOT/build
