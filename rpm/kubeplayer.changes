@@ -1,0 +1,29 @@
+-------------------------------------------------------------------
+Tue Jul 03 14:45:00 UTC 2012 - Robert Riemann <saloution@gmail.com>
+
+- update to version 1.2
+- fix for new youtube formats
+- this bugfix release resolves minor issues:
+- adjustments related to automated packaging
+- minor GUI adjustments for usage on tablet devices
+- fix for new youtube file format (itag 36)
+
+-------------------------------------------------------------------
+Wed Dec 15 23:54:31 UTC 2010 - rriemann@physik.hu-berlin.de
+
+- initial release, version 1.0
+
+Version 1.1 (2011-11-25)
+    
+    - make video download available using kget
+    - make open in browser available
+    - add tablet patches to desktop version (button to open/close video list
+      and move toolbar to top edge)
+    - show video quality in toolbar
+    - add possiblity to start youtube videos via command line
+    - use only one unique video and start cmd videos in already open window
+    - more trickier youtube plugin makes even more videos available to
+      kubeplayer
+    - fix youtube suggestions
+    - fix in youtube plugin: better automatic choice of video quality
+

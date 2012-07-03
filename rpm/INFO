@@ -1,0 +1,10 @@
+DEVELOPERS: Robert Riemann <saloution@googlemail.com>
+LICENSE: GPL
+SUMMARY: Multiplatform online video player
+VERSION: 1.2
+DESCRIPTION:
+Multiplatform online video player
+END_DESCRIPTION
+URL: http://projects.kde.org/projects/playground/multimedia/kubeplayer 
+REQUIRES += ruby-kde4
+
