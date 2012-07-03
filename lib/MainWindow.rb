@@ -172,8 +172,6 @@ class MainWindow < KDE::MainWindow
 
     ini_phonon collection, menu, controlBar
 
-    menuBar.add_menu helpMenu
-
     collection.associate_widget self
     collection.read_settings
     set_auto_save_settings
@@ -186,6 +184,8 @@ class MainWindow < KDE::MainWindow
 
     menu = KDE::Menu.new i18n('&View'), self
     menuBar.add_menu menu
+
+    menuBar.add_menu helpMenu
 
     # add clip list dock widget
     @listDock = Qt::DockWidget.new self
