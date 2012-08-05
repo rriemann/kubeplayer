@@ -1,0 +1,113 @@
+# Language template for Kubeplayer
+#
+# Copyright (C) 2012
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2012-08-05 13:45+0200\n"
+"PO-Revision-Date: 2012-08-05 13:45+0200\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: lib/kubeplayer.rb:23
+msgid "Kube Player"
+msgstr ""
+
+#: lib/kubeplayer.rb:25
+msgid "A video player dedicated to play online videos."
+msgstr ""
+
+#: lib/kubeplayer.rb:27
+msgid "(c) 2012, Robert Riemann"
+msgstr ""
+
+#: lib/kubeplayer.rb:28
+msgid "Kube Player is a dedicated to play online videos without the need of flash.\nIf you find a bug, please report it to <a href=\"http://github.com/saLOUt/kubeplayer/issues\">http://github.com/saLOUt/kubeplayer/issues</a>."
+msgstr ""
+
+#: lib/kubeplayer.rb:35
+msgid "URL to open"
+msgstr ""
+
+#: lib/MainWindow.rb:55
+msgid "&Pause"
+msgstr ""
+
+#: lib/MainWindow.rb:68
+msgid "Previous"
+msgstr ""
+
+#: lib/MainWindow.rb:74
+msgid "Stop"
+msgstr ""
+
+#: lib/MainWindow.rb:83
+msgid "Forward"
+msgstr ""
+
+#: lib/MainWindow.rb:91
+msgctxt "Playback menu"
+msgid "Audio"
+msgstr ""
+
+#: lib/MainWindow.rb:94
+msgid "Mute Volume"
+msgstr ""
+
+#: lib/MainWindow.rb:106
+msgid "Volume Slider"
+msgstr ""
+
+#: lib/MainWindow.rb:110
+msgid "Position Slider"
+msgstr ""
+
+#: lib/MainWindow.rb:127
+msgid "&File"
+msgstr ""
+
+#: lib/MainWindow.rb:130
+msgid "Download"
+msgstr ""
+
+#: lib/MainWindow.rb:153
+msgid "Open in Browser"
+msgstr ""
+
+#: lib/MainWindow.rb:170
+msgid "&Play"
+msgstr ""
+
+#: lib/MainWindow.rb:185
+msgid "&View"
+msgstr ""
+
+#: lib/MainWindow.rb:247
+msgid "The given URL <a href='%1'>%1</a> is not supported, because there is appropriate website plugin.<br />You may want to file a feature request."
+msgstr ""
+
+#: lib/MainWindow.rb:249
+msgid "No supported URL"
+msgstr ""
+
+#: lib/provider/youtube/Youtube.rb:51
+msgid "No Videos found"
+msgstr ""
+
+#: lib/provider/youtube/Youtube.rb:121
+msgid "<strong>Youtube reports:</strong><br/><br/> %1"
+msgstr ""
+
+#: lib/provider/youtube/Youtube.rb:123
+msgid "It was not possible to grap an accessible video."
+msgstr ""
