@@ -16,7 +16,7 @@ class Video < KubePlayer::Video
   FORMAT2NUMBER = {:flv => [5, 6, 34, 35], :mp4 => [18, 22, 37, 38, 83, 82, 85, 84], :webm => [43, 44, 45, 100, 101, 46, 102] , :'3gp' => [13, 17, 36]}
   NUMBER2FORMAT = FORMAT2NUMBER.custom_revert
 
-  RESOLUTION2NUMBER = {224 => [5, 6], 240 => [83], 360 => [34, 18, 82, 43, 100], 480 => [35, 44, 101], 520 => [85], 540 => [46], 720 => [22, 84, 45, 102], 1080 => [37], 2304 => [38]}
+  RESOLUTION2NUMBER = {224 => [5, 6], 240 => [36, 83], 360 => [34, 18, 82, 43, 100], 480 => [35, 44, 101], 520 => [85], 540 => [46], 720 => [22, 84, 45, 102], 1080 => [37], 2304 => [38]}
   NUMBER2RESOLUTION = RESOLUTION2NUMBER.custom_revert
 
   #:call-seq:
